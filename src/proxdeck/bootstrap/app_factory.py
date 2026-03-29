@@ -16,8 +16,8 @@ from proxdeck.domain.policies.widget_compatibility_policy import (
     WidgetCompatibilityPolicy,
 )
 from proxdeck.infrastructure.persistence.json_screen_repository import JsonScreenRepository
-from proxdeck.infrastructure.system.resolution_runtime_target_detector import (
-    ResolutionRuntimeTargetDetector,
+from proxdeck.infrastructure.system.qt_screen_runtime_target_detector import (
+    QtScreenRuntimeTargetDetector,
 )
 from proxdeck.infrastructure.widgets.discovered_widget_catalog import (
     DiscoveredWidgetCatalog,
@@ -69,7 +69,7 @@ class AppFactory:
         runtime_controller = RuntimeController(
             runtime_startup_service=RuntimeStartupService(
                 screen_service=screen_service,
-                runtime_target_detector=ResolutionRuntimeTargetDetector(),
+                runtime_target_detector=QtScreenRuntimeTargetDetector(),
             ),
             screen_service=screen_service,
         )
