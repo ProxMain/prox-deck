@@ -71,3 +71,12 @@ def test_management_service_updates_web_widget_settings() -> None:
     settings = updated.layout.widget_instances[0].settings
     assert settings["url"] == "https://openai.com"
     assert settings["force_mobile"] is True
+
+
+def test_management_state_lists_builtin_widgets() -> None:
+    service = build_management_service()
+
+    state = service.load_management_state()
+
+    widget_ids = {item.widget_id for item in state.widget_definitions}
+    assert {"clock", "launcher", "notes", "system-stats", "web", "media-controls"} <= widget_ids

@@ -6,6 +6,8 @@ from proxdeck.application.controllers.management_controller import ManagementCon
 from proxdeck.application.controllers.runtime_controller import RuntimeController
 from proxdeck.application.dto.management_state import ManagementState
 from proxdeck.application.dto.runtime_state import RuntimeState
+from proxdeck.domain.models.screen import Screen
+from proxdeck.presentation.widgets.widget_host_factory import WidgetHostFactory
 
 try:
     from PySide6.QtCore import Qt
@@ -68,6 +70,7 @@ class RuntimeWindow(QMainWindow):
         self._runtime_controller = runtime_controller
         self._runtime_state = runtime_state
         self._management_state = self._management_controller.load_management_state()
+        self._widget_host_factory = WidgetHostFactory()
         self._screen_selector: QComboBox | None = None
         self._screen_banner: QLabel | None = None
         self._content_stack: QStackedWidget | None = None
@@ -80,6 +83,7 @@ class RuntimeWindow(QMainWindow):
         self._row_input: QSpinBox | None = None
         self._width_input: QSpinBox | None = None
         self._height_input: QSpinBox | None = None
+        self._dashboard_grid: QGridLayout | None = None
 
         self._configure_window()
         self._build_ui()
@@ -136,13 +140,9 @@ class RuntimeWindow(QMainWindow):
         grid_frame = QFrame()
         grid_layout = QGridLayout(grid_frame)
         grid_layout.setSpacing(12)
-        for row in range(2):
-            for column in range(3):
-                cell = QLabel(f"Cell {row * 3 + column + 1}")
-                cell.setFrameStyle(QFrame.Shape.Box | QFrame.Shadow.Plain)
-                cell.setAlignment(Qt.AlignmentFlag.AlignCenter)
-                grid_layout.addWidget(cell, row, column)
+        self._dashboard_grid = grid_layout
         layout.addWidget(grid_frame)
+        self._render_runtime_screen(self._runtime_state.active_screen)
         return widget
 
     def _build_management_view(self) -> QWidget:
@@ -250,6 +250,12 @@ class RuntimeWindow(QMainWindow):
             self._screen_banner.setText(str(error))
             return
 
+        self._runtime_state = RuntimeState(
+            active_screen=screen,
+            available_screens=self._runtime_state.available_screens,
+            runtime_target=self._runtime_state.runtime_target,
+        )
+        self._render_runtime_screen(screen)
         self._screen_banner.setText(f"{screen.name}\n{screen.availability.value.title()} profile loaded.")
 
     def _build_spin_box(self, minimum: int, maximum: int) -> QSpinBox:
@@ -315,6 +321,7 @@ class RuntimeWindow(QMainWindow):
             return
 
         self._refresh_management_instances()
+        self._refresh_runtime_after_management()
 
     def _handle_remove_widget(self) -> None:
         if self._management_screen_selector is None or self._widget_instance_list is None:
@@ -334,6 +341,7 @@ class RuntimeWindow(QMainWindow):
             return
 
         self._refresh_management_instances()
+        self._refresh_runtime_after_management()
 
     def _load_web_widget_settings(self, *_args) -> None:
         if (
@@ -396,3 +404,64 @@ class RuntimeWindow(QMainWindow):
             return
 
         self._refresh_management_instances()
+        self._refresh_runtime_after_management()
+
+    def _refresh_runtime_after_management(self) -> None:
+        self._management_state = self._management_controller.load_management_state()
+        active_screen = next(
+            (
+                screen
+                for screen in self._management_state.screens
+                if screen.screen_id == self._runtime_state.active_screen.screen_id
+            ),
+            None,
+        )
+        if active_screen is None:
+            return
+
+        self._runtime_state = RuntimeState(
+            active_screen=active_screen,
+            available_screens=tuple(self._management_state.screens),
+            runtime_target=self._runtime_state.runtime_target,
+        )
+        self._render_runtime_screen(active_screen)
+
+    def _render_runtime_screen(self, screen: Screen) -> None:
+        if self._dashboard_grid is None:
+            return
+
+        while self._dashboard_grid.count():
+            item = self._dashboard_grid.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.deleteLater()
+
+        occupied_cells = set()
+        for instance in screen.layout.widget_instances:
+            occupied_cells.update(instance.placement.cells())
+            widget = self._widget_host_factory.create_widget(instance)
+            self._dashboard_grid.addWidget(
+                widget,
+                instance.placement.row,
+                instance.placement.column,
+                instance.placement.height,
+                instance.placement.width,
+            )
+
+        for row in range(2):
+            for column in range(3):
+                if (column, row) in occupied_cells:
+                    continue
+                cell = QLabel(f"Empty cell {row * 3 + column + 1}")
+                cell.setFrameStyle(QFrame.Shape.Box | QFrame.Shadow.Plain)
+                cell.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                cell.setStyleSheet(
+                    "QLabel {"
+                    "color: #8CA0B3;"
+                    "background: #17202B;"
+                    "border: 1px dashed #415062;"
+                    "border-radius: 12px;"
+                    "padding: 12px;"
+                    "}"
+                )
+                self._dashboard_grid.addWidget(cell, row, column)
