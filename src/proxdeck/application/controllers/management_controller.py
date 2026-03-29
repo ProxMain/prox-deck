@@ -47,6 +47,22 @@ class ManagementController:
             size_preset=size_preset,
         )
 
+    def add_widget_instance_smart(
+        self,
+        screen_id: str,
+        widget_id: str,
+        preferred_column: int,
+        preferred_row: int,
+        size_preset: str = "1/6",
+    ) -> Screen:
+        return self._widget_management_service.add_widget_instance_smart(
+            screen_id=screen_id,
+            widget_id=widget_id,
+            preferred_column=preferred_column,
+            preferred_row=preferred_row,
+            size_preset=size_preset,
+        )
+
     def remove_widget_instance(self, screen_id: str, instance_id: str) -> Screen:
         return self._widget_management_service.remove_widget_instance(screen_id, instance_id)
 
@@ -118,4 +134,30 @@ class ManagementController:
             row=row,
             width=width,
             height=height,
+        )
+
+    def move_widget_instance_smart(
+        self,
+        screen_id: str,
+        instance_id: str,
+        preferred_column: int,
+        preferred_row: int,
+    ) -> Screen:
+        return self._widget_management_service.move_widget_instance_smart(
+            screen_id=screen_id,
+            instance_id=instance_id,
+            preferred_column=preferred_column,
+            preferred_row=preferred_row,
+        )
+
+    def resize_widget_instance_smart(
+        self,
+        screen_id: str,
+        instance_id: str,
+        size_preset: str,
+    ) -> Screen:
+        return self._widget_management_service.resize_widget_instance_smart(
+            screen_id=screen_id,
+            instance_id=instance_id,
+            size_preset=size_preset,
         )

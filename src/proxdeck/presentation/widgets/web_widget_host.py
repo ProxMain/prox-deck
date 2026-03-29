@@ -60,46 +60,25 @@ def build_web_widget_host(
     url = normalize_web_widget_url(widget_instance.settings.get("url"))
     mobile = bool(widget_instance.settings.get("force_mobile", False))
 
-    card = QFrame()
-    card.setFrameStyle(QFrame.Shape.Box | QFrame.Shadow.Plain)
-    card.setStyleSheet(
+    container = QFrame()
+    container.setStyleSheet(
         "QFrame {"
-        "background: #0B1119;"
-        "border: 2px solid #B58CFF;"
-        "border-radius: 14px;"
+        "background: #05080C;"
+        "border: none;"
+        "border-radius: 0px;"
         "}"
-        "QLabel { color: #E7EEF7; }"
     )
 
-    layout = QVBoxLayout(card)
-    layout.setContentsMargins(8, 8, 8, 8)
-    layout.setSpacing(8)
+    layout = QVBoxLayout(container)
+    layout.setContentsMargins(0, 0, 0, 0)
+    layout.setSpacing(0)
 
-    title_label = QLabel("Web Widget")
-    title_label.setStyleSheet("font-size: 18px; font-weight: 700; color: #F4EDFF;")
-    layout.addWidget(title_label)
-
-    subtitle_label = QLabel("Mobile view enabled" if mobile else "Desktop view enabled")
-    subtitle_label.setStyleSheet("font-size: 12px; color: #B9A2E9;")
-    layout.addWidget(subtitle_label)
-
-    browser_view = QWebEngineView(card)
-    browser_view.setPage(_build_browser_page(card, mobile))
+    browser_view = QWebEngineView(container)
+    browser_view.setPage(_build_browser_page(container, mobile))
     browser_view.page().setBackgroundColor(QColor("#0F1722"))
     browser_view.setUrl(QUrl(url))
     layout.addWidget(browser_view, 1)
-
-    url_label = QLabel(url)
-    url_label.setWordWrap(True)
-    url_label.setStyleSheet("font-size: 11px; color: #96A9BF;")
-    layout.addWidget(url_label)
-
-    footer_label = QLabel(footer)
-    footer_label.setWordWrap(True)
-    footer_label.setStyleSheet("font-size: 11px; color: #89A0B8;")
-    layout.addWidget(footer_label)
-
-    return card
+    return container
 
 
 def _build_browser_page(parent: QWidget, force_mobile: bool) -> QWebEnginePage:
@@ -109,7 +88,7 @@ def _build_browser_page(parent: QWidget, force_mobile: bool) -> QWebEnginePage:
         profile.setHttpUserAgent(user_agent)
 
     settings = profile.settings()
-    settings.setAttribute(QWebEngineSettings.WebAttribute.FullScreenSupportEnabled, False)
+    settings.setAttribute(QWebEngineSettings.WebAttribute.FullScreenSupportEnabled, True)
     settings.setAttribute(QWebEngineSettings.WebAttribute.PluginsEnabled, False)
     settings.setAttribute(QWebEngineSettings.WebAttribute.JavascriptCanOpenWindows, False)
     return QWebEnginePage(profile, parent)

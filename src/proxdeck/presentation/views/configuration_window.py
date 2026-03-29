@@ -18,8 +18,8 @@ class ConfigurationWindow(QMainWindow):
         on_state_changed: Callable[[], None] | None = None,
     ) -> None:
         super().__init__()
-        self.setWindowTitle("Prox Deck Configuration")
-        self.resize(1100, 820)
+        self.setWindowTitle("Prox Deck // Control Room")
+        self.resize(1440, 920)
         self._management_view = ManagementView(
             management_controller=management_controller,
             on_state_changed=on_state_changed,

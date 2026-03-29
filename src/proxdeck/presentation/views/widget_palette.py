@@ -3,16 +3,14 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from proxdeck.domain.models.widget_definition import WidgetDefinition
+from proxdeck.presentation.views.scene_svg import build_svg_label, widget_icon_asset
 
 try:
-    from PySide6.QtCore import QMimeData, QPoint, Qt
-    from PySide6.QtGui import QDrag, QMouseEvent
+    from PySide6.QtCore import Qt
+    from PySide6.QtGui import QMouseEvent
     from PySide6.QtWidgets import QFrame, QGridLayout, QLabel, QVBoxLayout, QWidget
 except ModuleNotFoundError:  # pragma: no cover - optional during headless tests
-    QMimeData = object
-    QPoint = object
     Qt = object
-    QDrag = object
     QMouseEvent = object
     QFrame = object
     QGridLayout = object
@@ -68,62 +66,53 @@ class _PaletteCard(QFrame):
         super().__init__(parent)
         self._definition = definition
         self._on_select = on_select
-        self._drag_start: QPoint | None = None
-        self.setCursor(Qt.CursorShape.OpenHandCursor)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setStyleSheet(
             "QFrame {"
-            f"background: {'#2A3F53' if selected else '#18232D'};"
-            f"border: 2px solid {'#8BD3FF' if selected else '#314355'};"
-            "border-radius: 14px;"
+            f"background: {'#213547' if selected else '#16222C'};"
+            f"border: 2px solid {'#F0B557' if selected else '#314355'};"
+            "border-radius: 18px;"
             "}"
             "QLabel { background: transparent; }"
         )
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(12, 12, 12, 12)
-        layout.setSpacing(6)
+        layout.setContentsMargins(14, 14, 14, 14)
+        layout.setSpacing(8)
+
+        badge = QLabel("Ready" if selected else "Add")
+        badge.setStyleSheet(
+            "font-size: 10px; font-weight: 700; color: #102030; "
+            f"background: {'#F0B557' if selected else '#8FA3B7'}; border-radius: 9px; padding: 3px 8px;"
+        )
+        badge.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        layout.addWidget(badge, 0, Qt.AlignmentFlag.AlignLeft)
+
+        icon_label = build_svg_label(widget_icon_asset(definition.widget_id), 48, 48)
+        icon_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        layout.addWidget(icon_label, 0, Qt.AlignmentFlag.AlignLeft)
 
         title = QLabel(definition.display_name)
-        title.setStyleSheet("font-size: 14px; font-weight: 700; color: #EAF0F6;")
+        title.setStyleSheet("font-size: 15px; font-weight: 800; color: #F5F8FB;")
+        title.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         layout.addWidget(title)
 
         kind = QLabel(definition.kind.value.title())
         kind.setStyleSheet("font-size: 11px; color: #8FA3B7;")
+        kind.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         layout.addWidget(kind)
 
         capabilities = ", ".join(sorted(definition.capabilities.values)) or "none"
         detail = QLabel(f"Capabilities: {capabilities}")
         detail.setWordWrap(True)
         detail.setStyleSheet("font-size: 11px; color: #B8C7D5;")
+        detail.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         layout.addWidget(detail)
 
-        hint = QLabel("Drag into the grid")
-        hint.setStyleSheet("font-size: 11px; color: #E3A23B; font-weight: 700;")
+        hint = QLabel("Click, then place")
+        hint.setStyleSheet("font-size: 11px; color: #F0B557; font-weight: 700;")
+        hint.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         layout.addWidget(hint)
 
     def mousePressEvent(self, event: QMouseEvent) -> None:  # type: ignore[override]
         self._on_select(self._definition.widget_id)
-        if event.button() == Qt.MouseButton.LeftButton:
-            self._drag_start = event.position().toPoint()
         super().mousePressEvent(event)
-
-    def mouseMoveEvent(self, event: QMouseEvent) -> None:  # type: ignore[override]
-        if (
-            self._drag_start is None
-            or not (event.buttons() & Qt.MouseButton.LeftButton)
-            or QDrag is object
-            or QMimeData is object
-        ):
-            super().mouseMoveEvent(event)
-            return
-
-        if (event.position().toPoint() - self._drag_start).manhattanLength() < 10:
-            super().mouseMoveEvent(event)
-            return
-
-        drag = QDrag(self)
-        mime_data = QMimeData()
-        mime_data.setData("application/x-proxdeck-widget", self._definition.widget_id.encode("utf-8"))
-        drag.setMimeData(mime_data)
-        drag.exec(Qt.DropAction.CopyAction)
-        self._drag_start = None
-        super().mouseMoveEvent(event)

@@ -9,8 +9,8 @@ from proxdeck.domain.models.screen import Screen
 from proxdeck.domain.models.widget_definition import WidgetDefinition
 from proxdeck.domain.models.widget_instance import WidgetInstance
 from proxdeck.domain.policies.widget_placement_finder import WidgetPlacementFinder
-from proxdeck.domain.value_objects.widget_size import WidgetSize
 from proxdeck.domain.value_objects.widget_placement import WidgetPlacement
+from proxdeck.domain.value_objects.widget_size import WidgetSize
 
 
 class WidgetManagementService:
@@ -69,6 +69,34 @@ class WidgetManagementService:
             row=row,
             width=width,
             height=height,
+        )
+
+    def add_widget_instance_smart(
+        self,
+        screen_id: str,
+        widget_id: str,
+        preferred_column: int,
+        preferred_row: int,
+        size_preset: str = "1/6",
+    ) -> Screen:
+        _, width, height = WidgetSize.from_preset(size_preset)
+        placement = self._find_best_available_placement(
+            screen_id=screen_id,
+            widget_id=widget_id,
+            width=width,
+            height=height,
+            preferred_column=preferred_column,
+            preferred_row=preferred_row,
+        )
+        if placement is None:
+            raise ValueError("No room is available for that widget right now")
+        return self.add_widget_instance(
+            screen_id=screen_id,
+            widget_id=widget_id,
+            column=placement.column,
+            row=placement.row,
+            width=placement.width,
+            height=placement.height,
         )
 
     def remove_widget_instance(self, screen_id: str, instance_id: str) -> Screen:
@@ -203,8 +231,106 @@ class WidgetManagementService:
             height=height,
         )
 
+    def move_widget_instance_smart(
+        self,
+        screen_id: str,
+        instance_id: str,
+        preferred_column: int,
+        preferred_row: int,
+    ) -> Screen:
+        screen = self._get_screen(screen_id)
+        widget_instance = self._get_widget_instance(screen, instance_id)
+        base_layout = screen.layout.without_widget_instance(instance_id)
+        placement = self._widget_placement_finder.find_best_available(
+            layout=base_layout,
+            screen_id=screen_id,
+            widget_id=widget_instance.widget_id,
+            width=widget_instance.placement.width,
+            height=widget_instance.placement.height,
+            preferred_column=preferred_column,
+            preferred_row=preferred_row,
+        )
+        if placement is None:
+            raise ValueError("No room is available to move that widget there")
+        return self.update_widget_instance_placement(
+            screen_id=screen_id,
+            instance_id=instance_id,
+            column=placement.column,
+            row=placement.row,
+            width=placement.width,
+            height=placement.height,
+        )
+
+    def resize_widget_instance_smart(
+        self,
+        screen_id: str,
+        instance_id: str,
+        size_preset: str,
+    ) -> Screen:
+        screen = self._get_screen(screen_id)
+        widget_instance = self._get_widget_instance(screen, instance_id)
+        _, width, height = WidgetSize.from_preset(size_preset)
+        base_layout = screen.layout.without_widget_instance(instance_id)
+        placement = self._widget_placement_finder.find_best_available(
+            layout=base_layout,
+            screen_id=screen_id,
+            widget_id=widget_instance.widget_id,
+            width=width,
+            height=height,
+            preferred_column=widget_instance.placement.column,
+            preferred_row=widget_instance.placement.row,
+        )
+        if placement is None:
+            raise ValueError("No room is available for that widget size")
+        return self.update_widget_instance_placement(
+            screen_id=screen_id,
+            instance_id=instance_id,
+            column=placement.column,
+            row=placement.row,
+            width=placement.width,
+            height=placement.height,
+        )
+
     def _generate_instance_id(self, widget_id: str) -> str:
         return f"{widget_id}-{uuid.uuid4().hex[:8]}"
+
+    def _find_best_available_placement(
+        self,
+        screen_id: str,
+        widget_id: str,
+        width: int,
+        height: int,
+        preferred_column: int,
+        preferred_row: int,
+    ) -> WidgetPlacement | None:
+        screen = self._get_screen(screen_id)
+        return self._widget_placement_finder.find_best_available(
+            layout=screen.layout,
+            screen_id=screen_id,
+            widget_id=widget_id,
+            width=width,
+            height=height,
+            preferred_column=preferred_column,
+            preferred_row=preferred_row,
+        )
+
+    def _get_screen(self, screen_id: str) -> Screen:
+        screen = next(
+            (item for item in self._screen_service.list_screens() if item.screen_id == screen_id),
+            None,
+        )
+        if screen is None:
+            raise ValueError(f"Unknown screen id: {screen_id}")
+        return screen
+
+    def _get_widget_instance(self, screen: Screen, instance_id: str) -> WidgetInstance:
+        widget_instance = next(
+            (item for item in screen.layout.widget_instances if item.instance_id == instance_id),
+            None,
+        )
+        if widget_instance is None:
+            raise ValueError(f"Unknown widget instance id: {instance_id}")
+        return widget_instance
 
     def _build_default_settings(self, widget_id: str) -> dict[str, object]:
         if widget_id == "launcher":

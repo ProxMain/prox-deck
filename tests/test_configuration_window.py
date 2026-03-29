@@ -29,7 +29,7 @@ def test_configuration_window_wraps_management_view() -> None:
     )
     window = ConfigurationWindow(StubManagementController([screen]))
 
-    assert window.windowTitle() == "Prox Deck Configuration"
+    assert window.windowTitle() == "Prox Deck // Control Room"
     assert window.centralWidget() is window.management_view
 
     window.deleteLater()

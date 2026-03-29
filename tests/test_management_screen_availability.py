@@ -57,10 +57,10 @@ def test_management_view_disables_controls_for_soon_screen() -> None:
     view = ManagementView(StubManagementController([screen]))
 
     assert view._management_status_label.text() == "Developing is not editable yet. This screen is marked Soon."
-    assert view._add_widget_button.isEnabled() is False
-    assert view._suggest_placement_button.isEnabled() is False
     assert view._save_web_button.isEnabled() is False
     assert view._management_widget_selector.isEnabled() is False
+    assert view._widget_palette.isEnabled() is False
+    assert view._layout_preview.isEnabled() is False
 
     view.deleteLater()
     app.processEvents()
@@ -77,10 +77,10 @@ def test_management_view_enables_controls_for_available_screen() -> None:
     view = ManagementView(StubManagementController([screen]))
 
     assert view._management_status_label.text() == "Gaming is editable."
-    assert view._add_widget_button.isEnabled() is True
-    assert view._suggest_placement_button.isEnabled() is True
     assert view._save_web_button.isEnabled() is True
     assert view._management_widget_selector.isEnabled() is True
+    assert view._widget_palette.isEnabled() is True
+    assert view._layout_preview.isEnabled() is True
 
     view.deleteLater()
     app.processEvents()

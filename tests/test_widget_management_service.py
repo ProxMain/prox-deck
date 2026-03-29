@@ -229,3 +229,98 @@ def test_management_service_rejects_overlapping_widget_placement_update() -> Non
         assert "overlaps" in str(error).lower()
     else:  # pragma: no cover - defensive assertion
         raise AssertionError("Expected overlapping placement update to be rejected")
+
+
+def test_management_service_adds_widget_near_requested_cell_when_slot_is_free() -> None:
+    service = build_management_service()
+
+    screen = service.add_widget_instance_smart(
+        screen_id="gaming",
+        widget_id="clock",
+        preferred_column=2,
+        preferred_row=1,
+    )
+
+    placement = screen.layout.widget_instances[0].placement
+    assert (placement.column, placement.row) == (2, 1)
+
+
+def test_management_service_adds_widget_to_nearest_available_slot_when_requested_cell_is_taken() -> None:
+    service = build_management_service()
+    service.add_widget_instance(
+        screen_id="gaming",
+        widget_id="notes",
+        column=2,
+        row=1,
+        width=1,
+        height=1,
+    )
+
+    screen = service.add_widget_instance_smart(
+        screen_id="gaming",
+        widget_id="clock",
+        preferred_column=2,
+        preferred_row=1,
+    )
+
+    placement = next(
+        instance.placement for instance in screen.layout.widget_instances if instance.widget_id == "clock"
+    )
+    assert (placement.column, placement.row) in {(1, 1), (2, 0)}
+
+
+def test_management_service_moves_widget_to_nearest_valid_slot() -> None:
+    service = build_management_service()
+    first = service.add_widget_instance(
+        screen_id="gaming",
+        widget_id="clock",
+        column=0,
+        row=0,
+        width=1,
+        height=1,
+    )
+    service.add_widget_instance(
+        screen_id="gaming",
+        widget_id="notes",
+        column=1,
+        row=0,
+        width=1,
+        height=1,
+    )
+
+    updated = service.move_widget_instance_smart(
+        screen_id="gaming",
+        instance_id=first.layout.widget_instances[0].instance_id,
+        preferred_column=1,
+        preferred_row=0,
+    )
+
+    placement = next(
+        instance.placement
+        for instance in updated.layout.widget_instances
+        if instance.widget_id == "clock"
+    )
+    assert (placement.column, placement.row) in {(0, 0), (2, 0), (1, 1)}
+
+
+def test_management_service_resizes_widget_and_rehomes_it_when_needed() -> None:
+    service = build_management_service()
+    screen = service.add_widget_instance(
+        screen_id="gaming",
+        widget_id="clock",
+        column=2,
+        row=0,
+        width=1,
+        height=1,
+    )
+    instance_id = screen.layout.widget_instances[0].instance_id
+
+    updated = service.resize_widget_instance_smart(
+        screen_id="gaming",
+        instance_id=instance_id,
+        size_preset="2/6-wide",
+    )
+
+    placement = updated.layout.widget_instances[0].placement
+    assert (placement.width, placement.height) == (2, 1)
+    assert (placement.column, placement.row) == (1, 0)

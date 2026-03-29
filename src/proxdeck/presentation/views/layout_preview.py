@@ -5,6 +5,7 @@ from collections.abc import Callable
 from proxdeck.domain.models.screen import Screen
 from proxdeck.domain.models.widget_definition import WidgetDefinition
 from proxdeck.domain.models.widget_instance import WidgetInstance
+from proxdeck.presentation.views.scene_svg import build_svg_label, widget_icon_asset
 
 try:
     from PySide6.QtCore import QMimeData, QPoint, Qt
@@ -29,15 +30,19 @@ class LayoutPreviewWidget(QFrame):
         self,
         on_move_instance: Callable[[str, int, int], None],
         on_resize_instance: Callable[[str, str], None],
+        on_remove_instance: Callable[[str], None],
         on_select_instance: Callable[[str], None],
         on_add_widget: Callable[[str, int, int], None],
+        on_activate_cell: Callable[[int, int], None],
         render_widget_preview: Callable[[WidgetInstance, WidgetDefinition | None], QWidget],
     ) -> None:
         super().__init__()
         self._on_move_instance = on_move_instance
         self._on_resize_instance = on_resize_instance
+        self._on_remove_instance = on_remove_instance
         self._on_select_instance = on_select_instance
         self._on_add_widget = on_add_widget
+        self._on_activate_cell = on_activate_cell
         self._render_widget_preview = render_widget_preview
         self._screen: Screen | None = None
         self._definitions: dict[str, WidgetDefinition] = {}
@@ -111,6 +116,7 @@ class LayoutPreviewWidget(QFrame):
             occupied.update(instance.placement.cells())
             tile = _PreviewTile(
                 instance=instance,
+                widget_id=instance.widget_id,
                 display_name=self._display_name_for(instance),
                 preview_widget=self._render_widget_preview(
                     instance,
@@ -118,6 +124,7 @@ class LayoutPreviewWidget(QFrame):
                 ),
                 selected=instance.instance_id == self._selected_instance_id,
                 on_resize=self._on_resize_instance,
+                on_remove=self._on_remove_instance,
                 on_select=self._on_select_instance,
                 parent=self,
             )
@@ -129,19 +136,9 @@ class LayoutPreviewWidget(QFrame):
             for column in range(3):
                 if (column, row) in occupied:
                     continue
-                label = QLabel("Empty", self)
-                label.setObjectName("preview-empty-cell")
-                label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                label = _PreviewCell(column=column, row=row, on_activate=self._on_activate_cell, parent=self)
                 x, y, width, height = self._geometry_for_cell(column, row)
                 label.setGeometry(x, y, width, height)
-                label.setStyleSheet(
-                    "QLabel {"
-                    "color: #6F879B;"
-                    "background: #16212C;"
-                    "border: 1px dashed #415062;"
-                    "border-radius: 12px;"
-                    "}"
-                )
                 label.show()
 
     def _display_name_for(self, instance: WidgetInstance) -> str:
@@ -186,51 +183,76 @@ class _PreviewTile(QFrame):
     def __init__(
         self,
         instance: WidgetInstance,
+        widget_id: str,
         display_name: str,
         preview_widget: QWidget,
         selected: bool,
         on_resize: Callable[[str, str], None],
+        on_remove: Callable[[str], None],
         on_select: Callable[[str], None],
         parent: QWidget,
     ) -> None:
         super().__init__(parent)
         self._instance = instance
+        self._widget_id = widget_id
         self._on_resize = on_resize
+        self._on_remove = on_remove
         self._on_select = on_select
         self._drag_start: QPoint | None = None
         self.setCursor(Qt.CursorShape.OpenHandCursor)
         self.setStyleSheet(
             "QFrame {"
-            f"background: {'#294962' if selected else '#1E2C3A'};"
-            f"border: 2px solid {'#8BD3FF' if selected else '#5A778F'};"
-            "border-radius: 12px;"
+            f"background: {'#24394B' if selected else '#182530'};"
+            f"border: 2px solid {'#F0B557' if selected else '#42596E'};"
+            "border-radius: 18px;"
             "}"
             "QLabel { color: #EAF0F6; background: transparent; }"
             "QPushButton {"
-            "background: #E3A23B;"
+            "background: rgba(240, 181, 87, 0.96);"
             "border: none;"
-            "border-radius: 8px;"
-            "padding: 4px 8px;"
+            "border-radius: 12px;"
+            "padding: 6px 10px;"
             "color: #1E1609;"
-            "font-size: 11px;"
+            "font-size: 12px;"
             "font-weight: 700;"
             "}"
         )
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(10, 10, 10, 10)
-        layout.setSpacing(6)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(8)
 
         header = QWidget(self)
         header_layout = QHBoxLayout(header)
         header_layout.setContentsMargins(0, 0, 0, 0)
         header_layout.setSpacing(8)
 
+        title_stack = QWidget(self)
+        title_layout = QVBoxLayout(title_stack)
+        title_layout.setContentsMargins(0, 0, 0, 0)
+        title_layout.setSpacing(2)
+
+        top_row = QHBoxLayout()
+        top_row.setContentsMargins(0, 0, 0, 0)
+        top_row.setSpacing(8)
+        icon_label = build_svg_label(widget_icon_asset(self._widget_id), 26, 26)
+        top_row.addWidget(icon_label, 0, Qt.AlignmentFlag.AlignTop)
+
         label = QLabel(display_name)
         label.setWordWrap(True)
-        header_layout.addWidget(label, 1)
+        label.setStyleSheet("font-size: 13px; font-weight: 700; color: #F5F8FB;")
+        top_row.addWidget(label, 1)
+        title_layout.addLayout(top_row)
+
+        badge = QLabel("Selected" if selected else "Widget")
+        badge.setStyleSheet(
+            "font-size: 10px; font-weight: 700; color: #0F1720; "
+            f"background: {'#F0B557' if selected else '#8FA3B7'}; border-radius: 9px; padding: 3px 8px;"
+        )
+        title_layout.addWidget(badge, 0, Qt.AlignmentFlag.AlignLeft)
+        header_layout.addWidget(title_stack, 1)
 
         controls = QWidget(self)
-        controls_layout = QHBoxLayout(controls)
+        controls_layout = QVBoxLayout(controls)
         controls_layout.setContentsMargins(0, 0, 0, 0)
         controls_layout.setSpacing(4)
         for text, preset in (
@@ -247,7 +269,25 @@ class _PreviewTile(QFrame):
                     selected_preset,
                 )
             )
+            button.setFixedSize(44, 28)
             controls_layout.addWidget(button)
+        remove_button = QPushButton("X")
+        remove_button.setStyleSheet(
+            "QPushButton {"
+            "background: rgba(210, 84, 84, 0.96);"
+            "border: none;"
+            "border-radius: 12px;"
+            "padding: 6px 10px;"
+            "color: #FFF4F4;"
+            "font-size: 12px;"
+            "font-weight: 700;"
+            "}"
+        )
+        remove_button.clicked.connect(
+            lambda _checked=False: self._on_remove(self._instance.instance_id)
+        )
+        remove_button.setFixedSize(44, 28)
+        controls_layout.addWidget(remove_button)
         header_layout.addWidget(controls)
         layout.addWidget(header)
 
@@ -303,3 +343,70 @@ def _make_preview_non_interactive(widget: QWidget) -> None:
     for child in widget.findChildren(QWidget):
         child.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         child.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+
+
+class _PreviewCell(QFrame):
+    def __init__(
+        self,
+        column: int,
+        row: int,
+        on_activate: Callable[[int, int], None],
+        parent: QWidget,
+    ) -> None:
+        super().__init__(parent)
+        self._column = column
+        self._row = row
+        self._on_activate = on_activate
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setStyleSheet(
+            "QFrame {"
+            "background: #13202A;"
+            "border: 1px dashed #3E5569;"
+            "border-radius: 18px;"
+            "}"
+            "QLabel { color: #7F96AA; background: transparent; font-weight: 700; }"
+        )
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(10, 10, 10, 10)
+        badge = QLabel("+", self)
+        badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        badge.setFixedSize(38, 38)
+        badge.setStyleSheet(
+            "font-size: 20px; font-weight: 700; color: #102030; "
+            "background: #F0B557; border-radius: 19px;"
+        )
+        badge.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        layout.addWidget(badge, 0, Qt.AlignmentFlag.AlignHCenter)
+        layout.addStretch(1)
+        label = QLabel("Place Widget", self)
+        label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        layout.addWidget(label)
+        layout.addStretch(1)
+
+    def enterEvent(self, event) -> None:  # type: ignore[override]
+        self.setStyleSheet(
+            "QFrame {"
+            "background: #203244;"
+            "border: 2px solid #F0B557;"
+            "border-radius: 18px;"
+            "}"
+            "QLabel { color: #F7D49A; background: transparent; font-weight: 700; }"
+        )
+        super().enterEvent(event)
+
+    def leaveEvent(self, event) -> None:  # type: ignore[override]
+        self.setStyleSheet(
+            "QFrame {"
+            "background: #13202A;"
+            "border: 1px dashed #3E5569;"
+            "border-radius: 18px;"
+            "}"
+            "QLabel { color: #7F96AA; background: transparent; font-weight: 700; }"
+        )
+        super().leaveEvent(event)
+
+    def mousePressEvent(self, event: QMouseEvent) -> None:  # type: ignore[override]
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._on_activate(self._column, self._row)
+        super().mousePressEvent(event)

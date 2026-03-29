@@ -4,14 +4,11 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 from proxdeck.application.controllers.management_controller import ManagementController
-from proxdeck.application.dto.management_state import ManagementState
 from proxdeck.domain.models.screen import Screen
-from proxdeck.domain.value_objects.widget_size import SIZE_PRESET_DIMENSIONS, WidgetSize
 from proxdeck.presentation.views.layout_preview import LayoutPreviewWidget
+from proxdeck.presentation.views.scene_svg import build_svg_label
+from proxdeck.presentation.views.widget_definition_summary import format_widget_definition_summary
 from proxdeck.presentation.views.widget_palette import WidgetPaletteView
-from proxdeck.presentation.views.widget_definition_summary import (
-    format_widget_definition_summary,
-)
 from proxdeck.presentation.widgets.widget_host_factory import WidgetHostFactory
 
 try:
@@ -21,7 +18,6 @@ try:
         QComboBox,
         QFormLayout,
         QFrame,
-        QGridLayout,
         QGroupBox,
         QHBoxLayout,
         QLabel,
@@ -31,17 +27,15 @@ try:
         QMessageBox,
         QPushButton,
         QScrollArea,
-        QSpinBox,
         QVBoxLayout,
         QWidget,
     )
-except ModuleNotFoundError:  # pragma: no cover - optional during headless tests
+except ModuleNotFoundError:  # pragma: no cover
     Qt = None
     QCheckBox = object
     QComboBox = object
     QFormLayout = object
     QFrame = object
-    QGridLayout = object
     QGroupBox = object
     QHBoxLayout = object
     QLabel = object
@@ -51,7 +45,6 @@ except ModuleNotFoundError:  # pragma: no cover - optional during headless tests
     QMessageBox = object
     QPushButton = object
     QScrollArea = object
-    QSpinBox = object
     QVBoxLayout = object
     QWidget = object
 
@@ -70,206 +63,232 @@ class ManagementView(QWidget):
     ) -> None:
         if Qt is None:
             raise RuntimeError("PySide6 is required to build the management view")
-
         super().__init__()
         self._management_controller = management_controller
         self._on_state_changed = on_state_changed
         self._management_state = self._management_controller.load_management_state()
         self._widget_host_factory = WidgetHostFactory()
+        self._selected_palette_widget_id: str | None = None
         self._management_screen_selector: QComboBox | None = None
         self._management_widget_selector: QComboBox | None = None
-        self._size_preset_selector: QComboBox | None = None
         self._widget_palette: WidgetPaletteView | None = None
         self._widget_instance_list: QListWidget | None = None
-        self._web_url_input: QLineEdit | None = None
-        self._web_mobile_checkbox: QCheckBox | None = None
-        self._launcher_label_inputs: list[QLineEdit] = []
-        self._launcher_target_inputs: list[QLineEdit] = []
         self._layout_preview: LayoutPreviewWidget | None = None
-        self._column_input: QSpinBox | None = None
-        self._row_input: QSpinBox | None = None
-        self._width_input: QSpinBox | None = None
-        self._height_input: QSpinBox | None = None
+        self._management_status_label: QLabel | None = None
         self._definition_metadata_label: QLabel | None = None
         self._instance_metadata_label: QLabel | None = None
-        self._management_status_label: QLabel | None = None
-        self._add_widget_button: QPushButton | None = None
-        self._suggest_placement_button: QPushButton | None = None
-        self._remove_widget_button: QPushButton | None = None
+        self._inspector_title_label: QLabel | None = None
+        self._inspector_subtitle_label: QLabel | None = None
+        self._web_card: QGroupBox | None = None
+        self._web_url_input: QLineEdit | None = None
+        self._web_mobile_checkbox: QCheckBox | None = None
         self._save_web_button: QPushButton | None = None
+        self._launcher_card: QGroupBox | None = None
+        self._launcher_label_inputs: list[QLineEdit] = []
+        self._launcher_target_inputs: list[QLineEdit] = []
         self._save_launcher_button: QPushButton | None = None
-
+        self._remove_widget_button: QPushButton | None = None
         self._build_ui()
 
     def _build_ui(self) -> None:
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 20, 20, 20)
-        layout.setSpacing(16)
+        root = QVBoxLayout(self)
+        root.setContentsMargins(18, 18, 18, 18)
+        root.setSpacing(16)
 
-        title_label = QLabel("Configuration")
-        title_label.setStyleSheet("font-size: 24px; font-weight: 700; color: #EAF0F6;")
-        layout.addWidget(title_label)
+        hero = QFrame()
+        hero.setObjectName("HeroPanel")
+        hero_layout = QHBoxLayout(hero)
+        hero_layout.setContentsMargins(22, 20, 22, 20)
+        hero_stack = QVBoxLayout()
+        hero_stack.setSpacing(6)
+        kicker = QLabel("PROX DECK // CONTROL ROOM")
+        kicker.setObjectName("HeroKicker")
+        hero_stack.addWidget(kicker)
+        title = QLabel("Build The Deck Like A Mission")
+        title.setObjectName("HeroTitle")
+        hero_stack.addWidget(title)
+        subtitle = QLabel("Deploy widgets onto the Xeneon Edge with a visual staging bay, not a settings form.")
+        subtitle.setObjectName("HeroSubtitle")
+        subtitle.setWordWrap(True)
+        hero_stack.addWidget(subtitle)
+        hero_layout.addLayout(hero_stack, 1)
+        hero_layout.addWidget(build_svg_label("command_ring.svg", 128, 128), 0, Qt.AlignmentFlag.AlignCenter)
+        self._management_status_label = QLabel()
+        self._management_status_label.setObjectName("StatusChip")
+        self._management_status_label.setWordWrap(True)
+        self._management_status_label.setMinimumWidth(260)
+        hero_layout.addWidget(self._management_status_label, 0, Qt.AlignmentFlag.AlignTop)
+        root.addWidget(hero)
 
-        subtitle_label = QLabel(
-            "Manage screens, place widgets, and configure widget-specific behavior."
-        )
-        subtitle_label.setWordWrap(True)
-        subtitle_label.setStyleSheet("font-size: 13px; color: #8FA3B7;")
-        layout.addWidget(subtitle_label)
+        body = QHBoxLayout()
+        body.setSpacing(16)
+        root.addLayout(body, 1)
 
-        content_layout = QHBoxLayout()
-        content_layout.setSpacing(16)
-        layout.addLayout(content_layout, 1)
+        self._build_left_panel(body)
+        self._build_stage_panel(body)
+        self._build_inspector_panel(body)
+        self._apply_theme()
+        self._refresh_management_instances()
+        self._refresh_definition_metadata()
+        self._refresh_palette()
 
-        left_column = QVBoxLayout()
-        left_column.setSpacing(16)
-        right_column = QVBoxLayout()
-        right_column.setSpacing(16)
-        content_layout.addLayout(left_column, 3)
-        content_layout.addLayout(right_column, 2)
+    def _build_left_panel(self, body: QHBoxLayout) -> None:
+        panel = QFrame()
+        panel.setObjectName("RailPanel")
+        panel.setMaximumWidth(360)
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(18, 18, 18, 18)
+        layout.setSpacing(14)
+        section_title = QLabel("Arsenal")
+        section_title.setObjectName("SectionTitle")
+        header = QHBoxLayout()
+        header.addWidget(section_title)
+        header.addStretch(1)
+        header.addWidget(build_svg_label("arsenal_emblem.svg", 44, 44))
+        layout.addLayout(header)
+        section_caption = QLabel("Choose the active screen and arm the next widget.")
+        section_caption.setObjectName("SectionCaption")
+        section_caption.setWordWrap(True)
+        layout.addWidget(section_caption)
 
-        selection_card = self._build_section_card("Screen & Palette")
-        selection_layout = QVBoxLayout(selection_card)
-        selection_layout.setSpacing(10)
-
+        screen_card = self._signal_card()
+        screen_layout = QVBoxLayout(screen_card)
+        screen_layout.addWidget(self._caption_label("Deployment Target"))
         self._management_screen_selector = QComboBox()
         for screen in self._management_state.screens:
             label = screen.name if screen.is_available() else f"{screen.name} (Soon)"
             self._management_screen_selector.addItem(label, screen.screen_id)
-        self._management_screen_selector.currentIndexChanged.connect(
-            self._refresh_management_instances
-        )
-        selection_layout.addWidget(QLabel("Screen"))
-        selection_layout.addWidget(self._management_screen_selector)
+        self._management_screen_selector.currentIndexChanged.connect(self._refresh_management_instances)
+        screen_layout.addWidget(self._management_screen_selector)
+        layout.addWidget(screen_card)
 
+        palette_card = self._signal_card()
+        palette_layout = QVBoxLayout(palette_card)
+        palette_title = QLabel("Widget Loadout")
+        palette_title.setObjectName("SectionTitle")
+        palette_layout.addWidget(palette_title)
         self._management_widget_selector = QComboBox()
         for definition in self._management_state.widget_definitions:
-            self._management_widget_selector.addItem(
-                definition.display_name,
-                definition.widget_id,
-        )
-        self._management_widget_selector.currentIndexChanged.connect(
-            self._refresh_definition_metadata
-        )
+            self._management_widget_selector.addItem(definition.display_name, definition.widget_id)
+        self._management_widget_selector.currentIndexChanged.connect(self._refresh_definition_metadata)
         self._management_widget_selector.hide()
-
-        self._size_preset_selector = QComboBox()
-        for preset in SIZE_PRESET_DIMENSIONS:
-            self._size_preset_selector.addItem(preset, preset)
-        self._size_preset_selector.currentIndexChanged.connect(self._apply_selected_size_preset)
-        self._size_preset_selector.hide()
-
-        palette_label = QLabel("Widget Palette")
-        palette_label.setStyleSheet("font-size: 13px; font-weight: 700; color: #EAF0F6;")
-        selection_layout.addWidget(palette_label)
+        palette_layout.addWidget(self._management_widget_selector)
         self._widget_palette = WidgetPaletteView(on_select_widget=self._handle_palette_select)
-        selection_layout.addWidget(self._widget_palette)
-
+        palette_layout.addWidget(self._widget_palette)
         self._definition_metadata_label = QLabel()
+        self._definition_metadata_label.setObjectName("PanelText")
         self._definition_metadata_label.setWordWrap(True)
-        self._definition_metadata_label.setStyleSheet("color: #C8D3DE;")
-        selection_layout.addWidget(self._definition_metadata_label)
+        palette_layout.addWidget(self._definition_metadata_label)
+        layout.addWidget(palette_card, 1)
+        body.addWidget(panel, 1)
 
-        left_column.addWidget(selection_card)
-
-        status_card = self._build_section_card("Screen Status")
-        status_layout = QVBoxLayout(status_card)
-        status_layout.setSpacing(8)
-        self._management_status_label = QLabel()
-        self._management_status_label.setWordWrap(True)
-        self._management_status_label.setStyleSheet("color: #D7E2EC;")
-        status_layout.addWidget(self._management_status_label)
-        left_column.addWidget(status_card)
-
-        placement_card = self._build_section_card("Placement & Add")
-        placement_layout = QGridLayout(placement_card)
-        placement_layout.setHorizontalSpacing(10)
-        placement_layout.setVerticalSpacing(10)
-        self._column_input = self._build_spin_box(0, 2)
-        self._row_input = self._build_spin_box(0, 1)
-        self._width_input = self._build_spin_box(1, 3)
-        self._height_input = self._build_spin_box(1, 2)
-        placement_layout.addWidget(QLabel("Column"), 0, 0)
-        placement_layout.addWidget(self._column_input, 0, 1)
-        placement_layout.addWidget(QLabel("Row"), 0, 2)
-        placement_layout.addWidget(self._row_input, 0, 3)
-        placement_layout.addWidget(QLabel("Width"), 1, 0)
-        placement_layout.addWidget(self._width_input, 1, 1)
-        placement_layout.addWidget(QLabel("Height"), 1, 2)
-        placement_layout.addWidget(self._height_input, 1, 3)
-
-        self._add_widget_button = QPushButton("Add Widget")
-        self._add_widget_button.clicked.connect(self._handle_add_widget)
-        self._suggest_placement_button = QPushButton("Suggest Placement")
-        self._suggest_placement_button.clicked.connect(self._handle_suggest_placement)
-        placement_layout.addWidget(self._suggest_placement_button, 2, 0, 1, 2)
-        placement_layout.addWidget(self._add_widget_button, 2, 2, 1, 2)
-        left_column.addWidget(placement_card)
-
-        instances_card = self._build_section_card("Widget Instances")
-        instances_layout = QVBoxLayout(instances_card)
-        instances_layout.setSpacing(10)
+    def _build_stage_panel(self, body: QHBoxLayout) -> None:
+        panel = QFrame()
+        panel.setObjectName("StagePanel")
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(18, 18, 18, 18)
+        layout.setSpacing(14)
+        title = QLabel("Deployment Stage")
+        title.setObjectName("SectionTitle")
+        layout.addWidget(title)
+        caption = QLabel("Select, place, resize, and pull widgets into formation.")
+        caption.setObjectName("SectionCaption")
+        caption.setWordWrap(True)
+        layout.addWidget(caption)
         self._layout_preview = LayoutPreviewWidget(
             on_move_instance=self._handle_preview_move,
             on_resize_instance=self._handle_preview_resize,
+            on_remove_instance=self._handle_preview_remove,
             on_select_instance=self._handle_preview_select,
             on_add_widget=self._handle_preview_add,
-            render_widget_preview=lambda instance, definition: self._widget_host_factory.create_widget(
-                instance,
-                definition,
-            ),
+            on_activate_cell=self._handle_preview_cell_activate,
+            render_widget_preview=lambda instance, definition: self._widget_host_factory.create_widget(instance, definition),
         )
-        instances_layout.addWidget(self._layout_preview)
+        self._layout_preview.setMinimumHeight(620)
+        layout.addWidget(self._layout_preview, 1)
         self._widget_instance_list = QListWidget()
         self._widget_instance_list.currentItemChanged.connect(self._load_web_widget_settings)
-        self._widget_instance_list.setMinimumHeight(220)
-        instances_layout.addWidget(self._widget_instance_list)
-
-        self._instance_metadata_label = QLabel()
-        self._instance_metadata_label.setWordWrap(True)
-        self._instance_metadata_label.setStyleSheet("color: #C8D3DE;")
-        instances_layout.addWidget(self._instance_metadata_label)
-
+        self._widget_instance_list.hide()
+        layout.addWidget(self._widget_instance_list)
         self._remove_widget_button = QPushButton("Remove Selected")
         self._remove_widget_button.clicked.connect(self._handle_remove_widget)
-        instances_layout.addWidget(self._remove_widget_button)
-        left_column.addWidget(instances_card, 1)
+        self._remove_widget_button.hide()
+        layout.addWidget(self._remove_widget_button)
+        body.addWidget(panel, 2)
 
-        config_scroll = QScrollArea()
-        config_scroll.setWidgetResizable(True)
-        config_scroll.setFrameShape(QFrame.Shape.NoFrame)
-        config_container = QWidget()
-        config_layout = QVBoxLayout(config_container)
-        config_layout.setContentsMargins(0, 0, 0, 0)
-        config_layout.setSpacing(16)
-        config_scroll.setWidget(config_container)
-        right_column.addWidget(config_scroll, 1)
+    def _build_inspector_panel(self, body: QHBoxLayout) -> None:
+        panel = QFrame()
+        panel.setObjectName("InspectorPanel")
+        panel.setMaximumWidth(380)
+        outer = QVBoxLayout(panel)
+        outer.setContentsMargins(18, 18, 18, 18)
+        outer.setSpacing(14)
+        title = QLabel("Inspector")
+        title.setObjectName("SectionTitle")
+        header = QHBoxLayout()
+        header.addWidget(title)
+        header.addStretch(1)
+        header.addWidget(build_svg_label("inspector_emblem.svg", 44, 44))
+        outer.addLayout(header)
+        caption = QLabel("Only the selected widget exposes its live controls.")
+        caption.setObjectName("SectionCaption")
+        caption.setWordWrap(True)
+        outer.addWidget(caption)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        outer.addWidget(scroll, 1)
+        container = QWidget()
+        scroll.setWidget(container)
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(14)
+        identity = self._signal_card()
+        identity_layout = QVBoxLayout(identity)
+        self._inspector_subtitle_label = QLabel("NO ACTIVE WIDGET")
+        self._inspector_subtitle_label.setObjectName("InspectorSubTitle")
+        identity_layout.addWidget(self._inspector_subtitle_label)
+        self._inspector_title_label = QLabel("Select a tile on the stage")
+        self._inspector_title_label.setObjectName("InspectorTitle")
+        self._inspector_title_label.setWordWrap(True)
+        identity_layout.addWidget(self._inspector_title_label)
+        self._instance_metadata_label = QLabel("Choose a widget from the arsenal, or click a deployed tile to inspect it.")
+        self._instance_metadata_label.setObjectName("PanelText")
+        self._instance_metadata_label.setWordWrap(True)
+        identity_layout.addWidget(self._instance_metadata_label)
+        layout.addWidget(identity)
+        self._build_web_card(layout)
+        self._build_launcher_card(layout)
+        layout.addStretch(1)
+        body.addWidget(panel, 1)
 
-        web_card = self._build_section_card("Web Widget")
-        web_layout = QVBoxLayout(web_card)
-        web_layout.setSpacing(10)
+    def _build_web_card(self, layout: QVBoxLayout) -> None:
+        self._web_card = QGroupBox("Browser Signal")
+        web = QVBoxLayout(self._web_card)
+        hint = QLabel("The web widget renders as a full-bleed Chromium surface inside its assigned slot.")
+        hint.setObjectName("PanelText")
+        hint.setWordWrap(True)
+        web.addWidget(hint)
         self._web_url_input = QLineEdit()
         self._web_url_input.setPlaceholderText("https://example.com")
-        self._web_mobile_checkbox = QCheckBox("Force mobile view")
-        web_layout.addWidget(QLabel("URL"))
-        web_layout.addWidget(self._web_url_input)
-        web_layout.addWidget(self._web_mobile_checkbox)
-
-        self._save_web_button = QPushButton("Save Web Settings")
+        web.addWidget(self._web_url_input)
+        self._web_mobile_checkbox = QCheckBox("Mobile viewport")
+        web.addWidget(self._web_mobile_checkbox)
+        self._save_web_button = QPushButton("Apply Browser Route")
         self._save_web_button.clicked.connect(self._handle_save_web_settings)
-        web_layout.addWidget(self._save_web_button)
-        config_layout.addWidget(web_card)
+        web.addWidget(self._save_web_button)
+        layout.addWidget(self._web_card)
 
-        launcher_card = self._build_section_card("Launcher")
-        launcher_layout = QVBoxLayout(launcher_card)
-        launcher_layout.setSpacing(10)
-        launcher_hint = QLabel("Configure up to four quick actions for the selected launcher.")
-        launcher_hint.setWordWrap(True)
-        launcher_hint.setStyleSheet("font-size: 12px; color: #8FA3B7;")
-        launcher_layout.addWidget(launcher_hint)
-        launcher_form = QFormLayout()
-        launcher_form.setHorizontalSpacing(10)
-        launcher_form.setVerticalSpacing(8)
+    def _build_launcher_card(self, layout: QVBoxLayout) -> None:
+        self._launcher_card = QGroupBox("Launcher Loadout")
+        launcher = QVBoxLayout(self._launcher_card)
+        hint = QLabel("Tune quick actions for the selected launcher tile.")
+        hint.setObjectName("PanelText")
+        hint.setWordWrap(True)
+        launcher.addWidget(hint)
+        form = QFormLayout()
+        form.setHorizontalSpacing(10)
+        form.setVerticalSpacing(8)
         for index in range(4):
             label_input = QLineEdit()
             label_input.setPlaceholderText(f"Action {index + 1} label")
@@ -277,70 +296,52 @@ class ManagementView(QWidget):
             target_input.setPlaceholderText(f"Action {index + 1} target")
             self._launcher_label_inputs.append(label_input)
             self._launcher_target_inputs.append(target_input)
-            row_widget = QWidget()
-            row_layout = QHBoxLayout(row_widget)
+            row = QWidget()
+            row_layout = QHBoxLayout(row)
             row_layout.setContentsMargins(0, 0, 0, 0)
             row_layout.setSpacing(8)
             row_layout.addWidget(label_input, 1)
             row_layout.addWidget(target_input, 2)
-            launcher_form.addRow(f"Action {index + 1}", row_widget)
-        launcher_layout.addLayout(launcher_form)
-
-        self._save_launcher_button = QPushButton("Save Launcher Settings")
+            form.addRow(f"Slot {index + 1}", row)
+        launcher.addLayout(form)
+        self._save_launcher_button = QPushButton("Commit Loadout")
         self._save_launcher_button.clicked.connect(self._handle_save_launcher_settings)
-        launcher_layout.addWidget(self._save_launcher_button)
-        config_layout.addWidget(launcher_card)
-        config_layout.addStretch(1)
+        launcher.addWidget(self._save_launcher_button)
+        layout.addWidget(self._launcher_card)
+        self._sync_inspector_visibility(None)
 
-        self._refresh_management_instances()
-        self._apply_selected_size_preset()
-        self._refresh_definition_metadata()
-        self._refresh_palette()
-
-        self.setStyleSheet(
-            "QWidget { background: #111820; color: #EAF0F6; }"
-            "QLabel { color: #EAF0F6; }"
-            "QComboBox, QLineEdit, QSpinBox, QListWidget {"
-            "background: #1A2430;"
-            "border: 1px solid #314355;"
-            "border-radius: 10px;"
-            "padding: 8px;"
-            "color: #EAF0F6;"
-            "}"
-            "QPushButton {"
-            "background: #E3A23B;"
-            "border: none;"
-            "border-radius: 10px;"
-            "padding: 10px 14px;"
-            "color: #1E1609;"
-            "font-weight: 700;"
-            "}"
-            "QPushButton:hover { background: #F0B557; }"
-            "QGroupBox {"
-            "border: 1px solid #2A3A49;"
-            "border-radius: 16px;"
-            "margin-top: 10px;"
-            "padding: 14px;"
-            "background: #151F29;"
-            "}"
-            "QGroupBox::title {"
-            "subcontrol-origin: margin;"
-            "left: 12px;"
-            "padding: 0 6px;"
-            "color: #F3F6FA;"
-            "font-weight: 700;"
-            "}"
-        )
-
-    def _build_section_card(self, title: str) -> QGroupBox:
-        card = QGroupBox(title)
-        card.setFlat(False)
+    def _signal_card(self) -> QFrame:
+        card = QFrame()
+        card.setObjectName("SignalCard")
         return card
 
-    def _build_spin_box(self, minimum: int, maximum: int) -> QSpinBox:
-        spin_box = QSpinBox()
-        spin_box.setRange(minimum, maximum)
-        return spin_box
+    def _caption_label(self, text: str) -> QLabel:
+        label = QLabel(text)
+        label.setObjectName("SectionCaption")
+        return label
+
+    def _apply_theme(self) -> None:
+        self.setStyleSheet(
+            "QWidget {background:#081018;color:#EAF1F9;font-family:'Segoe UI';}"
+            "QFrame#HeroPanel {background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #131E2A,stop:0.45 #0D151F,stop:1 #091017);border:1px solid #223648;border-radius:26px;}"
+            "QFrame#RailPanel,QFrame#StagePanel,QFrame#InspectorPanel {background:qlineargradient(x1:0,y1:0,x2:0,y2:1,stop:0 #101925,stop:1 #0B131B);border:1px solid #1E3142;border-radius:24px;}"
+            "QFrame#SignalCard {background:qlineargradient(x1:0,y1:0,x2:1,y2:1,stop:0 #172331,stop:1 #0F1822);border:1px solid #284054;border-radius:18px;}"
+            "QLabel#HeroKicker {font-size:11px;font-weight:800;letter-spacing:1px;color:#F0B557;}"
+            "QLabel#HeroTitle {font-size:34px;font-weight:900;color:#F4F8FC;}"
+            "QLabel#HeroSubtitle,QLabel#SectionCaption,QLabel#PanelText {color:#8EA4B6;}"
+            "QLabel#SectionTitle {font-size:15px;font-weight:800;color:#F4F8FC;}"
+            "QLabel#InspectorTitle {font-size:20px;font-weight:900;color:#F4F8FC;}"
+            "QLabel#InspectorSubTitle {font-size:12px;font-weight:700;color:#F0B557;}"
+            "QLabel#StatusChip {background:#132130;border:1px solid #284054;border-radius:14px;padding:8px 12px;color:#DCE6F0;font-weight:700;}"
+            "QComboBox,QLineEdit,QListWidget {background:#111C27;border:1px solid #2B4155;border-radius:14px;padding:10px 12px;color:#EFF5FB;selection-background-color:#F0B557;selection-color:#11171F;}"
+            "QPushButton {background:qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #F0B557,stop:1 #E48D3A);border:none;border-radius:14px;padding:11px 14px;color:#16110B;font-size:12px;font-weight:800;}"
+            "QPushButton:hover {background:qlineargradient(x1:0,y1:0,x2:1,y2:0,stop:0 #F6C36F,stop:1 #EEA252);}"
+            "QCheckBox {font-weight:700;color:#D9E4EE;}"
+            "QCheckBox::indicator {width:20px;height:20px;border-radius:6px;border:1px solid #345069;background:#101923;}"
+            "QCheckBox::indicator:checked {background:#F0B557;border:1px solid #F0B557;}"
+            "QGroupBox {border:1px solid #25384A;border-radius:20px;margin-top:12px;padding:14px;background:#0E1720;}"
+            "QGroupBox::title {subcontrol-origin:margin;left:14px;padding:0 6px;font-size:13px;font-weight:800;color:#F3F7FB;}"
+        )
 
     def refresh(self) -> None:
         self._refresh_management_state()
@@ -358,8 +359,8 @@ class ManagementView(QWidget):
     def _refresh_palette(self) -> None:
         if self._widget_palette is None:
             return
-        selected_widget_id = None
-        if self._management_widget_selector is not None:
+        selected_widget_id = self._selected_palette_widget_id
+        if selected_widget_id is None and self._management_widget_selector is not None:
             selected_widget_id = self._management_widget_selector.currentData()
         self._widget_palette.set_definitions(
             self._management_state.widget_definitions,
@@ -369,13 +370,12 @@ class ManagementView(QWidget):
     def _refresh_management_instances(self, *_args) -> None:
         if self._management_screen_selector is None or self._widget_instance_list is None:
             return
-
+        selected_instance_id = self._selected_instance_id()
         self._refresh_management_state()
         self._widget_instance_list.clear()
         screen = self._current_screen()
         if screen is None:
             return
-
         self._apply_screen_state(screen)
         self._refresh_layout_preview(screen)
         for instance in screen.layout.widget_instances:
@@ -385,81 +385,33 @@ class ManagementView(QWidget):
             )
             item.setData(Qt.ItemDataRole.UserRole, instance.instance_id)
             self._widget_instance_list.addItem(item)
-
-    def _handle_add_widget(self) -> None:
-        if (
-            self._management_screen_selector is None
-            or self._management_widget_selector is None
-            or self._size_preset_selector is None
-            or self._column_input is None
-            or self._row_input is None
-        ):
-            return
-
-        try:
-            self._management_controller.add_widget_instance_from_preset(
-                screen_id=self._management_screen_selector.currentData(),
-                widget_id=self._management_widget_selector.currentData(),
-                column=self._column_input.value(),
-                row=self._row_input.value(),
-                size_preset=self._size_preset_selector.currentData(),
-            )
-        except ValueError as error:
-            QMessageBox.warning(self, "Widget placement rejected", str(error))
-            return
-
-        self.refresh()
-        self._notify_state_changed()
-        self._refresh_layout_preview(self._current_screen())
+        if selected_instance_id is not None:
+            self._handle_preview_select(selected_instance_id)
+        elif self._widget_instance_list.count() > 0:
+            self._widget_instance_list.setCurrentRow(0)
+        else:
+            self._refresh_instance_metadata(None)
 
     def _handle_palette_select(self, widget_id: str) -> None:
+        self._selected_palette_widget_id = widget_id
         if self._management_widget_selector is None:
             return
         for index in range(self._management_widget_selector.count()):
             if self._management_widget_selector.itemData(index) == widget_id:
                 self._management_widget_selector.setCurrentIndex(index)
                 self._refresh_palette()
+                if self._management_status_label is not None:
+                    self._management_status_label.setText(
+                        f"{self._management_widget_selector.currentText()} ready. Click a slot to place it."
+                    )
                 return
-
-    def _handle_suggest_placement(self) -> None:
-        if (
-            self._management_screen_selector is None
-            or self._management_widget_selector is None
-            or self._size_preset_selector is None
-            or self._column_input is None
-            or self._row_input is None
-        ):
-            return
-
-        try:
-            placement = self._management_controller.suggest_placement_for_preset(
-                screen_id=self._management_screen_selector.currentData(),
-                widget_id=self._management_widget_selector.currentData(),
-                size_preset=self._size_preset_selector.currentData(),
-            )
-        except ValueError as error:
-            QMessageBox.warning(self, "Placement suggestion failed", str(error))
-            return
-
-        if placement is None:
-            QMessageBox.warning(
-                self,
-                "No placement available",
-                "No valid placement is available for the selected widget size.",
-            )
-            return
-
-        self._column_input.setValue(placement.column)
-        self._row_input.setValue(placement.row)
 
     def _handle_remove_widget(self) -> None:
         if self._management_screen_selector is None or self._widget_instance_list is None:
             return
-
         current_item = self._widget_instance_list.currentItem()
         if current_item is None:
             return
-
         try:
             self._management_controller.remove_widget_instance(
                 screen_id=self._management_screen_selector.currentData(),
@@ -468,7 +420,6 @@ class ManagementView(QWidget):
         except ValueError as error:
             QMessageBox.warning(self, "Widget removal failed", str(error))
             return
-
         self.refresh()
         self._notify_state_changed()
         self._refresh_layout_preview(self._current_screen())
@@ -481,7 +432,6 @@ class ManagementView(QWidget):
             or self._web_mobile_checkbox is None
         ):
             return
-
         current_item = self._widget_instance_list.currentItem()
         if current_item is None:
             self._web_url_input.clear()
@@ -489,35 +439,27 @@ class ManagementView(QWidget):
             self._clear_launcher_settings()
             self._refresh_instance_metadata(None)
             return
-
         screen = self._current_screen()
         if screen is None:
             return
-
         instance_id = current_item.data(Qt.ItemDataRole.UserRole)
         instance = next(
             (item for item in screen.layout.widget_instances if item.instance_id == instance_id),
             None,
         )
         if instance is None:
-            self._web_url_input.clear()
-            self._web_mobile_checkbox.setChecked(False)
-            self._clear_launcher_settings()
-            self._refresh_instance_metadata(instance)
+            self._refresh_instance_metadata(None)
             return
-
         if instance.widget_id == "web":
             self._web_url_input.setText(str(instance.settings.get("url", "")))
             self._web_mobile_checkbox.setChecked(bool(instance.settings.get("force_mobile", False)))
         else:
             self._web_url_input.clear()
             self._web_mobile_checkbox.setChecked(False)
-
         if instance.widget_id == "launcher":
             self._load_launcher_settings(instance.settings.get("items"))
         else:
             self._clear_launcher_settings()
-
         self._refresh_instance_metadata(instance)
         self._refresh_layout_preview(screen)
 
@@ -529,11 +471,9 @@ class ManagementView(QWidget):
             or self._web_mobile_checkbox is None
         ):
             return
-
         current_item = self._widget_instance_list.currentItem()
         if current_item is None:
             return
-
         try:
             self._management_controller.configure_web_widget(
                 screen_id=self._management_screen_selector.currentData(),
@@ -544,7 +484,6 @@ class ManagementView(QWidget):
         except ValueError as error:
             QMessageBox.warning(self, "Web widget configuration failed", str(error))
             return
-
         self.refresh()
         self._notify_state_changed()
         self._refresh_layout_preview(self._current_screen())
@@ -552,20 +491,15 @@ class ManagementView(QWidget):
     def _handle_save_launcher_settings(self) -> None:
         if self._management_screen_selector is None or self._widget_instance_list is None:
             return
-
         current_item = self._widget_instance_list.currentItem()
         if current_item is None:
             return
-
         try:
             self._management_controller.configure_launcher_widget(
                 screen_id=self._management_screen_selector.currentData(),
                 instance_id=current_item.data(Qt.ItemDataRole.UserRole),
                 items=[
-                    {
-                        "label": label_input.text(),
-                        "target": target_input.text(),
-                    }
+                    {"label": label_input.text(), "target": target_input.text()}
                     for label_input, target_input in zip(
                         self._launcher_label_inputs,
                         self._launcher_target_inputs,
@@ -575,58 +509,57 @@ class ManagementView(QWidget):
         except ValueError as error:
             QMessageBox.warning(self, "Launcher configuration failed", str(error))
             return
-
         self.refresh()
         self._notify_state_changed()
         self._refresh_layout_preview(self._current_screen())
 
-    def _apply_selected_size_preset(self, *_args) -> None:
-        if (
-            self._size_preset_selector is None
-            or self._width_input is None
-            or self._height_input is None
-        ):
-            return
-
-        preset = self._size_preset_selector.currentData()
-        _, width, height = WidgetSize.from_preset(preset)
-        self._width_input.setValue(width)
-        self._height_input.setValue(height)
-
     def _refresh_definition_metadata(self, *_args) -> None:
         if self._management_widget_selector is None or self._definition_metadata_label is None:
             return
-
         definition = self._find_widget_definition(self._management_widget_selector.currentData())
         if definition is None:
-            self._definition_metadata_label.setText("No widget definition selected.")
+            self._definition_metadata_label.setText("No widget armed.")
             return
-
         self._definition_metadata_label.setText(format_widget_definition_summary(definition))
 
     def _refresh_instance_metadata(self, instance) -> None:
-        if self._instance_metadata_label is None:
+        if (
+            self._instance_metadata_label is None
+            or self._inspector_title_label is None
+            or self._inspector_subtitle_label is None
+        ):
             return
-
         if instance is None:
-            self._instance_metadata_label.setText("No widget instance selected.")
+            self._inspector_subtitle_label.setText("NO ACTIVE WIDGET")
+            self._inspector_title_label.setText("Select a tile on the stage")
+            self._instance_metadata_label.setText(
+                "Choose a widget from the arsenal, or click a deployed tile to inspect it."
+            )
+            self._sync_inspector_visibility(None)
             return
-
         definition = self._find_widget_definition(instance.widget_id)
         if definition is None:
-            self._instance_metadata_label.setText(
-                f"Selected instance\nID: {instance.instance_id}\nDefinition metadata unavailable."
-            )
+            self._inspector_subtitle_label.setText(instance.instance_id.upper())
+            self._inspector_title_label.setText(instance.widget_id)
+            self._instance_metadata_label.setText("Manifest metadata unavailable for this deployed widget.")
+            self._sync_inspector_visibility(instance)
             return
-
+        self._inspector_subtitle_label.setText(instance.instance_id.upper())
+        self._inspector_title_label.setText(definition.display_name)
         self._instance_metadata_label.setText(
-            "Selected widget instance\n"
-            f"Instance: {instance.instance_id}\n"
-            f"Widget: {definition.display_name}\n"
+            f"Widget ID: {definition.widget_id}\n"
             f"Entrypoint: {definition.entrypoint}\n"
             f"Distribution: {definition.install_metadata.distribution}\n"
-            f"Installation scope: {definition.install_metadata.installation_scope}"
+            f"Scope: {definition.install_metadata.installation_scope}"
         )
+        self._sync_inspector_visibility(instance)
+
+    def _sync_inspector_visibility(self, instance) -> None:
+        widget_id = None if instance is None else instance.widget_id
+        if self._web_card is not None:
+            self._web_card.setVisible(widget_id == "web")
+        if self._launcher_card is not None:
+            self._launcher_card.setVisible(widget_id == "launcher")
 
     def _find_widget_definition(self, widget_id: str):
         return next(
@@ -641,7 +574,6 @@ class ManagementView(QWidget):
     def _current_screen(self) -> Screen | None:
         if self._management_screen_selector is None:
             return None
-
         screen_id = self._management_screen_selector.currentData()
         return next(
             (item for item in self._management_state.screens if item.screen_id == screen_id),
@@ -660,28 +592,21 @@ class ManagementView(QWidget):
         ui_state = self.build_screen_ui_state(screen)
         for widget in (
             self._management_widget_selector,
-            self._size_preset_selector,
-            self._column_input,
-            self._row_input,
-            self._width_input,
-            self._height_input,
+            self._widget_palette,
+            self._layout_preview,
             self._widget_instance_list,
             self._web_url_input,
             self._web_mobile_checkbox,
             *self._launcher_label_inputs,
             *self._launcher_target_inputs,
-            self._add_widget_button,
-            self._suggest_placement_button,
             self._remove_widget_button,
             self._save_web_button,
             self._save_launcher_button,
         ):
             if widget is not None:
                 widget.setEnabled(ui_state.editable)
-
         if self._management_status_label is not None:
             self._management_status_label.setText(ui_state.status_text)
-
         if not ui_state.editable:
             if self._web_url_input is not None:
                 self._web_url_input.clear()
@@ -718,32 +643,43 @@ class ManagementView(QWidget):
         )
 
     def _handle_preview_select(self, instance_id: str) -> None:
+        self._selected_palette_widget_id = None
+        self._refresh_palette()
         if self._widget_instance_list is None:
             return
         for index in range(self._widget_instance_list.count()):
             item = self._widget_instance_list.item(index)
             if item.data(Qt.ItemDataRole.UserRole) == instance_id:
                 self._widget_instance_list.setCurrentItem(item)
+                if self._management_status_label is not None:
+                    self._management_status_label.setText("Widget selected. Click a slot to move it.")
                 return
+
+    def _handle_preview_cell_activate(self, column: int, row: int) -> None:
+        if self._management_screen_selector is None:
+            return
+        if self._selected_palette_widget_id is not None:
+            self._handle_preview_add(self._selected_palette_widget_id, column, row)
+            self._selected_palette_widget_id = None
+            self._refresh_palette()
+            return
+        instance_id = self._selected_instance_id()
+        if instance_id is not None:
+            self._handle_preview_move(instance_id, column, row)
+            return
+        if self._management_status_label is not None:
+            self._management_status_label.setText("Choose a widget first.")
 
     def _handle_preview_move(self, instance_id: str, column: int, row: int) -> None:
         screen = self._current_screen()
         if screen is None:
             return
-        instance = next(
-            (item for item in screen.layout.widget_instances if item.instance_id == instance_id),
-            None,
-        )
-        if instance is None:
-            return
         try:
-            self._management_controller.update_widget_instance_placement(
+            self._management_controller.move_widget_instance_smart(
                 screen_id=screen.screen_id,
                 instance_id=instance_id,
-                column=column,
-                row=row,
-                width=instance.placement.width,
-                height=instance.placement.height,
+                preferred_column=column,
+                preferred_row=row,
             )
         except ValueError as error:
             QMessageBox.warning(self, "Move rejected", str(error))
@@ -757,21 +693,11 @@ class ManagementView(QWidget):
         screen = self._current_screen()
         if screen is None:
             return
-        instance = next(
-            (item for item in screen.layout.widget_instances if item.instance_id == instance_id),
-            None,
-        )
-        if instance is None:
-            return
-        _, width, height = WidgetSize.from_preset(size_preset)
         try:
-            self._management_controller.update_widget_instance_placement(
+            self._management_controller.resize_widget_instance_smart(
                 screen_id=screen.screen_id,
                 instance_id=instance_id,
-                column=instance.placement.column,
-                row=instance.placement.row,
-                width=width,
-                height=height,
+                size_preset=size_preset,
             )
         except ValueError as error:
             QMessageBox.warning(self, "Resize rejected", str(error))
@@ -781,15 +707,30 @@ class ManagementView(QWidget):
         self._notify_state_changed()
         self._handle_preview_select(instance_id)
 
+    def _handle_preview_remove(self, instance_id: str) -> None:
+        if self._management_screen_selector is None:
+            return
+        try:
+            self._management_controller.remove_widget_instance(
+                screen_id=self._management_screen_selector.currentData(),
+                instance_id=instance_id,
+            )
+        except ValueError as error:
+            QMessageBox.warning(self, "Remove rejected", str(error))
+            self._refresh_layout_preview(self._current_screen())
+            return
+        self.refresh()
+        self._notify_state_changed()
+
     def _handle_preview_add(self, widget_id: str, column: int, row: int) -> None:
         if self._management_screen_selector is None:
             return
         try:
-            self._management_controller.add_widget_instance_from_preset(
+            updated_screen = self._management_controller.add_widget_instance_smart(
                 screen_id=self._management_screen_selector.currentData(),
                 widget_id=widget_id,
-                column=column,
-                row=row,
+                preferred_column=column,
+                preferred_row=row,
                 size_preset="1/6",
             )
         except ValueError as error:
@@ -797,8 +738,12 @@ class ManagementView(QWidget):
             self._refresh_layout_preview(self._current_screen())
             return
         self._handle_palette_select(widget_id)
+        self._selected_palette_widget_id = None
+        self._refresh_palette()
         self.refresh()
         self._notify_state_changed()
+        if updated_screen.layout.widget_instances:
+            self._handle_preview_select(updated_screen.layout.widget_instances[-1].instance_id)
 
     @staticmethod
     def build_screen_ui_state(screen: Screen) -> ManagementScreenUiState:
