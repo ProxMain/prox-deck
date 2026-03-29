@@ -21,8 +21,7 @@ except ModuleNotFoundError as error:  # pragma: no cover - startup guard
 def main() -> int:
     app = QApplication(sys.argv)
     proxdeck = AppFactory(project_root=PROJECT_ROOT).create()
-    window = proxdeck.build_window()
-    window.show()
+    proxdeck.start()
     return app.exec()
 
 

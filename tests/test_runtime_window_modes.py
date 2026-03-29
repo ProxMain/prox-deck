@@ -52,10 +52,7 @@ def test_runtime_window_uses_dashboard_only_layout_for_detected_target() -> None
 
     layout = window.centralWidget().layout()
 
-    assert window._content_stack is None
-    assert window._management_view is None
     assert window._screen_selector is None
-    assert window._screen_banner is None
     assert layout.contentsMargins().left() == 0
     assert layout.contentsMargins().top() == 0
 
@@ -78,10 +75,7 @@ def test_runtime_window_keeps_management_shell_in_fallback_mode() -> None:
 
     layout = window.centralWidget().layout()
 
-    assert window._content_stack is not None
-    assert window._management_view is not None
     assert window._screen_selector is not None
-    assert window._screen_banner is not None
     assert layout.contentsMargins().left() == 24
     assert layout.contentsMargins().top() == 24
 

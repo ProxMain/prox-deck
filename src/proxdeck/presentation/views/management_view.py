@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from proxdeck.application.controllers.management_controller import ManagementController
@@ -49,12 +50,17 @@ class ManagementScreenUiState:
 
 
 class ManagementView(QWidget):
-    def __init__(self, management_controller: ManagementController) -> None:
+    def __init__(
+        self,
+        management_controller: ManagementController,
+        on_state_changed: Callable[[], None] | None = None,
+    ) -> None:
         if Qt is None:
             raise RuntimeError("PySide6 is required to build the management view")
 
         super().__init__()
         self._management_controller = management_controller
+        self._on_state_changed = on_state_changed
         self._management_state = self._management_controller.load_management_state()
         self._management_screen_selector: QComboBox | None = None
         self._management_widget_selector: QComboBox | None = None
@@ -175,6 +181,10 @@ class ManagementView(QWidget):
         self._refresh_management_instances()
         self._refresh_definition_metadata()
 
+    def _notify_state_changed(self) -> None:
+        if self._on_state_changed is not None:
+            self._on_state_changed()
+
     def _refresh_management_state(self) -> None:
         self._management_state = self._management_controller.load_management_state()
 
@@ -220,6 +230,7 @@ class ManagementView(QWidget):
             return
 
         self.refresh()
+        self._notify_state_changed()
 
     def _handle_suggest_placement(self) -> None:
         if (
@@ -270,6 +281,7 @@ class ManagementView(QWidget):
             return
 
         self.refresh()
+        self._notify_state_changed()
 
     def _load_web_widget_settings(self, *_args) -> None:
         if (
@@ -331,6 +343,7 @@ class ManagementView(QWidget):
             return
 
         self.refresh()
+        self._notify_state_changed()
 
     def _apply_selected_size_preset(self, *_args) -> None:
         if (
