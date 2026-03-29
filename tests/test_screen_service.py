@@ -4,6 +4,7 @@ from proxdeck.application.services.default_screen_factory import DefaultScreenFa
 from proxdeck.application.services.screen_service import ScreenService
 from proxdeck.domain.contracts.screen_repository import ScreenRepository
 from proxdeck.domain.models.screen import Screen
+from proxdeck.domain.models.widget_kind import WidgetKind
 from proxdeck.domain.policies.widget_compatibility_policy import (
     WidgetCompatibilityPolicy,
 )
@@ -21,6 +22,7 @@ from proxdeck.infrastructure.widgets.filesystem_widget_discovery import (
 from proxdeck.infrastructure.widgets.json_widget_manifest_loader import (
     JsonWidgetManifestLoader,
 )
+from proxdeck.infrastructure.widgets.widget_discovery_root import WidgetDiscoveryRoot
 
 
 class InMemoryScreenRepository(ScreenRepository):
@@ -38,7 +40,16 @@ def build_widget_catalog() -> DiscoveredWidgetCatalog:
     project_root = Path(__file__).resolve().parent.parent
     return DiscoveredWidgetCatalog(
         widget_discovery=FilesystemWidgetDiscovery(
-            roots=(project_root / "widgets", project_root / "installable_widgets"),
+            roots=(
+                WidgetDiscoveryRoot(
+                    path=project_root / "widgets",
+                    expected_kind=WidgetKind.BUILTIN,
+                ),
+                WidgetDiscoveryRoot(
+                    path=project_root / "installable_widgets",
+                    expected_kind=WidgetKind.INSTALLABLE,
+                ),
+            ),
             loader=JsonWidgetManifestLoader(),
         ),
         current_app_version=AppVersion.parse("0.1.0"),

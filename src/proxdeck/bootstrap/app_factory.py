@@ -9,6 +9,7 @@ from proxdeck.application.services.runtime_startup_service import RuntimeStartup
 from proxdeck.application.services.screen_service import ScreenService
 from proxdeck.application.services.widget_management_service import WidgetManagementService
 from proxdeck.bootstrap.settings import APP_VERSION, AppPaths, build_app_paths
+from proxdeck.domain.models.widget_kind import WidgetKind
 from proxdeck.domain.policies.layout_policy import LayoutPolicy
 from proxdeck.domain.policies.screen_availability_policy import ScreenAvailabilityPolicy
 from proxdeck.domain.policies.widget_compatibility_policy import (
@@ -27,6 +28,7 @@ from proxdeck.infrastructure.widgets.filesystem_widget_discovery import (
 from proxdeck.infrastructure.widgets.json_widget_manifest_loader import (
     JsonWidgetManifestLoader,
 )
+from proxdeck.infrastructure.widgets.widget_discovery_root import WidgetDiscoveryRoot
 from proxdeck.presentation.app import ProxDeckApplication
 
 
@@ -43,8 +45,14 @@ class AppFactory:
         widget_catalog = DiscoveredWidgetCatalog(
             widget_discovery=FilesystemWidgetDiscovery(
                 roots=(
-                    self._paths.builtin_widgets_root,
-                    self._paths.installable_widgets_root,
+                    WidgetDiscoveryRoot(
+                        path=self._paths.builtin_widgets_root,
+                        expected_kind=WidgetKind.BUILTIN,
+                    ),
+                    WidgetDiscoveryRoot(
+                        path=self._paths.installable_widgets_root,
+                        expected_kind=WidgetKind.INSTALLABLE,
+                    ),
                 ),
                 loader=JsonWidgetManifestLoader(),
             ),

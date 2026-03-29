@@ -6,6 +6,8 @@ from pathlib import Path
 from proxdeck.domain.exceptions.widget_discovery_errors import (
     DuplicateWidgetIdError,
     IncompatibleWidgetError,
+    WidgetDiscoveryLocationError,
+    WidgetInstallMetadataError,
     WidgetManifestLoadError,
 )
 from proxdeck.domain.models.widget_kind import WidgetKind
@@ -22,6 +24,7 @@ from proxdeck.infrastructure.widgets.filesystem_widget_discovery import (
 from proxdeck.infrastructure.widgets.json_widget_manifest_loader import (
     JsonWidgetManifestLoader,
 )
+from proxdeck.infrastructure.widgets.widget_discovery_root import WidgetDiscoveryRoot
 
 
 def test_manifest_loader_reads_builtin_widget_manifest() -> None:
@@ -39,7 +42,16 @@ def test_discovery_catalog_loads_builtin_widget_manifests() -> None:
     project_root = Path(__file__).resolve().parent.parent
     catalog = DiscoveredWidgetCatalog(
         widget_discovery=FilesystemWidgetDiscovery(
-            roots=(project_root / "widgets", project_root / "installable_widgets"),
+            roots=(
+                WidgetDiscoveryRoot(
+                    path=project_root / "widgets",
+                    expected_kind=WidgetKind.BUILTIN,
+                ),
+                WidgetDiscoveryRoot(
+                    path=project_root / "installable_widgets",
+                    expected_kind=WidgetKind.INSTALLABLE,
+                ),
+            ),
             loader=JsonWidgetManifestLoader(),
         ),
         current_app_version=AppVersion.parse("0.1.0"),
@@ -47,7 +59,15 @@ def test_discovery_catalog_loads_builtin_widget_manifests() -> None:
     )
 
     widget_ids = {item.widget_id for item in catalog.list_widget_definitions()}
-    assert {"clock", "launcher", "notes", "system-stats", "web", "media-controls"} <= widget_ids
+    assert {
+        "clock",
+        "launcher",
+        "notes",
+        "system-stats",
+        "web",
+        "media-controls",
+        "community-browser",
+    } <= widget_ids
 
 
 def test_manifest_loader_rejects_invalid_manifest() -> None:
@@ -103,7 +123,16 @@ def test_discovery_catalog_rejects_duplicate_widget_ids() -> None:
         try:
             DiscoveredWidgetCatalog(
                 widget_discovery=FilesystemWidgetDiscovery(
-                    roots=(first_root, second_root),
+                    roots=(
+                        WidgetDiscoveryRoot(
+                            path=first_root,
+                            expected_kind=WidgetKind.BUILTIN,
+                        ),
+                        WidgetDiscoveryRoot(
+                            path=second_root,
+                            expected_kind=WidgetKind.BUILTIN,
+                        ),
+                    ),
                     loader=JsonWidgetManifestLoader(),
                 ),
                 current_app_version=AppVersion.parse("0.1.0"),
@@ -148,7 +177,12 @@ def test_discovery_catalog_rejects_incompatible_widget() -> None:
         try:
             DiscoveredWidgetCatalog(
                 widget_discovery=FilesystemWidgetDiscovery(
-                    roots=(widget_root,),
+                    roots=(
+                        WidgetDiscoveryRoot(
+                            path=widget_root,
+                            expected_kind=WidgetKind.INSTALLABLE,
+                        ),
+                    ),
                     loader=JsonWidgetManifestLoader(),
                 ),
                 current_app_version=AppVersion.parse("0.1.0"),
@@ -159,6 +193,94 @@ def test_discovery_catalog_rejects_incompatible_widget() -> None:
             return
 
         raise AssertionError("Expected incompatible widget to be rejected")
+    finally:
+        shutil.rmtree(temp_root, ignore_errors=True)
+
+
+def test_discovery_rejects_installable_kind_in_builtin_root() -> None:
+    temp_root = build_temp_root()
+    try:
+        builtin_root = temp_root / "widgets"
+        (builtin_root / "future-widget").mkdir(parents=True)
+        (builtin_root / "future-widget" / "manifest.json").write_text(
+            json.dumps(
+                {
+                    "widget_id": "future-widget",
+                    "display_name": "Future Widget",
+                    "version": "1.0.0",
+                    "kind": "installable",
+                    "compatibility": {"minimum_app_version": "0.1.0"},
+                    "install_metadata": {
+                        "distribution": "installer",
+                        "installation_scope": "custom-directory"
+                    },
+                    "capabilities": [],
+                    "entrypoint": "installable_widgets.future_widget",
+                    "supports_multiple_instances": True,
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        try:
+            FilesystemWidgetDiscovery(
+                roots=(
+                    WidgetDiscoveryRoot(
+                        path=builtin_root,
+                        expected_kind=WidgetKind.BUILTIN,
+                    ),
+                ),
+                loader=JsonWidgetManifestLoader(),
+            ).discover_manifests()
+        except WidgetDiscoveryLocationError as error:
+            assert error.widget_id == "future-widget"
+            return
+
+        raise AssertionError("Expected builtin root to reject installable widget kind")
+    finally:
+        shutil.rmtree(temp_root, ignore_errors=True)
+
+
+def test_discovery_rejects_invalid_installable_metadata() -> None:
+    temp_root = build_temp_root()
+    try:
+        installable_root = temp_root / "installable_widgets"
+        (installable_root / "bad-widget").mkdir(parents=True)
+        (installable_root / "bad-widget" / "manifest.json").write_text(
+            json.dumps(
+                {
+                    "widget_id": "bad-widget",
+                    "display_name": "Bad Widget",
+                    "version": "1.0.0",
+                    "kind": "installable",
+                    "compatibility": {"minimum_app_version": "0.1.0"},
+                    "install_metadata": {
+                        "distribution": "core",
+                        "installation_scope": "bundled"
+                    },
+                    "capabilities": [],
+                    "entrypoint": "installable_widgets.bad_widget",
+                    "supports_multiple_instances": True,
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        try:
+            FilesystemWidgetDiscovery(
+                roots=(
+                    WidgetDiscoveryRoot(
+                        path=installable_root,
+                        expected_kind=WidgetKind.INSTALLABLE,
+                    ),
+                ),
+                loader=JsonWidgetManifestLoader(),
+            ).discover_manifests()
+        except WidgetInstallMetadataError as error:
+            assert error.widget_id == "bad-widget"
+            return
+
+        raise AssertionError("Expected installable metadata validation to fail")
     finally:
         shutil.rmtree(temp_root, ignore_errors=True)
 

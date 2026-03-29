@@ -20,6 +20,7 @@ class WidgetHostFactory:
     def __init__(self) -> None:
         self._builders: dict[str, Callable[[WidgetInstance, WidgetDefinition | None], QWidget]] = {
             "clock": self._build_clock_widget,
+            "community-browser": self._build_community_browser_widget,
             "launcher": self._build_launcher_widget,
             "notes": self._build_notes_widget,
             "system-stats": self._build_system_stats_widget,
@@ -103,6 +104,19 @@ class WidgetHostFactory:
             subtitle=widget_instance.instance_id,
             detail="Reserved for quick app and action launching.",
             accent="#66D18F",
+            footer=self._build_metadata_footer(widget_definition),
+        )
+
+    def _build_community_browser_widget(
+        self,
+        widget_instance: WidgetInstance,
+        widget_definition: WidgetDefinition | None,
+    ) -> QWidget:
+        return self._build_card(
+            title="Community Browser",
+            subtitle=widget_instance.instance_id,
+            detail="Sample installable widget placeholder discovered from installable_widgets/.",
+            accent="#4ED0C3",
             footer=self._build_metadata_footer(widget_definition),
         )
 

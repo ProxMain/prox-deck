@@ -1,0 +1,16 @@
+{
+  "widget_id": "community-browser",
+  "display_name": "Community Browser",
+  "version": "1.0.0",
+  "kind": "installable",
+  "compatibility": {
+    "minimum_app_version": "0.1.0"
+  },
+  "install_metadata": {
+    "distribution": "installer",
+    "installation_scope": "custom-directory"
+  },
+  "capabilities": ["network"],
+  "entrypoint": "installable_widgets.community_browser",
+  "supports_multiple_instances": true
+}

@@ -34,3 +34,24 @@ class IncompatibleWidgetError(WidgetDiscoveryError):
         self.widget_id = widget_id
         self.required_version = required_version
         self.current_version = current_version
+
+
+class WidgetDiscoveryLocationError(WidgetDiscoveryError):
+    """Raised when a widget kind does not match the discovery root."""
+
+    def __init__(self, widget_id: str, expected_kind: str, actual_kind: str) -> None:
+        super().__init__(
+            f"Widget '{widget_id}' was discovered in a {expected_kind} root but declares kind '{actual_kind}'"
+        )
+        self.widget_id = widget_id
+        self.expected_kind = expected_kind
+        self.actual_kind = actual_kind
+
+
+class WidgetInstallMetadataError(WidgetDiscoveryError):
+    """Raised when install metadata does not match widget kind rules."""
+
+    def __init__(self, widget_id: str, reason: str) -> None:
+        super().__init__(f"Widget '{widget_id}' has invalid install metadata: {reason}")
+        self.widget_id = widget_id
+        self.reason = reason
