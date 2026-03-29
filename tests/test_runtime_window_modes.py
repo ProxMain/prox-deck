@@ -83,6 +83,29 @@ def test_runtime_window_keeps_management_shell_in_fallback_mode() -> None:
     app.processEvents()
 
 
+def test_runtime_window_locks_dashboard_grid_to_even_three_by_two_cell_distribution() -> None:
+    app = QApplication.instance() or QApplication([])
+    screen = _build_screen()
+    window = RuntimeWindow(
+        management_controller=StubManagementController([screen]),
+        runtime_controller=StubRuntimeController(screen),
+        runtime_state=RuntimeState(
+            active_screen=screen,
+            available_screens=(screen,),
+            runtime_target=None,
+        ),
+    )
+
+    grid = window._dashboard_grid
+
+    assert grid is not None
+    assert [grid.columnStretch(index) for index in range(3)] == [1, 1, 1]
+    assert [grid.rowStretch(index) for index in range(2)] == [1, 1]
+
+    window.deleteLater()
+    app.processEvents()
+
+
 def _build_screen() -> Screen:
     return Screen(
         screen_id="gaming",

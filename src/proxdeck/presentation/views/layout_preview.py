@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from functools import partial
 
 from proxdeck.domain.models.screen import Screen
 from proxdeck.domain.models.widget_definition import WidgetDefinition
 from proxdeck.domain.models.widget_instance import WidgetInstance
+from proxdeck.domain.value_objects.widget_size import normalize_size_preset
 from proxdeck.presentation.views.scene_svg import build_svg_label, widget_icon_asset
 
 try:
@@ -263,12 +265,7 @@ class _PreviewTile(QFrame):
             ("6", "6/6"),
         ):
             button = QPushButton(text)
-            button.clicked.connect(
-                lambda _checked=False, selected_preset=preset: self._on_resize(
-                    self._instance.instance_id,
-                    selected_preset,
-                )
-            )
+            button.clicked.connect(partial(self._handle_resize_click, preset))
             button.setFixedSize(44, 28)
             controls_layout.addWidget(button)
         remove_button = QPushButton("X")
@@ -283,9 +280,7 @@ class _PreviewTile(QFrame):
             "font-weight: 700;"
             "}"
         )
-        remove_button.clicked.connect(
-            lambda _checked=False: self._on_remove(self._instance.instance_id)
-        )
+        remove_button.clicked.connect(self._handle_remove_click)
         remove_button.setFixedSize(44, 28)
         controls_layout.addWidget(remove_button)
         header_layout.addWidget(controls)
@@ -335,6 +330,15 @@ class _PreviewTile(QFrame):
         drag.exec(Qt.DropAction.MoveAction)
         self._drag_start = None
         super().mouseMoveEvent(event)
+
+    def _handle_resize_click(self, preset: str, *_) -> None:
+        self._on_resize(
+            self._instance.instance_id,
+            normalize_size_preset(preset),
+        )
+
+    def _handle_remove_click(self, *_) -> None:
+        self._on_remove(self._instance.instance_id)
 
 
 def _make_preview_non_interactive(widget: QWidget) -> None:
