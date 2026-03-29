@@ -6,6 +6,9 @@ from proxdeck.domain.models.widget_definition import WidgetDefinition
 from proxdeck.domain.models.widget_instance import WidgetInstance
 from proxdeck.presentation.widgets.clock_widget_host import build_clock_widget_host
 from proxdeck.presentation.widgets.launcher_widget_host import build_launcher_widget_host
+from proxdeck.presentation.widgets.media_controls_widget_host import (
+    build_media_controls_widget_host,
+)
 from proxdeck.presentation.widgets.notes_widget_host import build_notes_widget_host
 from proxdeck.presentation.widgets.system_stats_widget_host import (
     build_system_stats_widget_host,
@@ -171,11 +174,9 @@ class WidgetHostFactory:
         widget_instance: WidgetInstance,
         widget_definition: WidgetDefinition | None,
     ) -> QWidget:
-        return self._build_card(
-            title="Media Controls",
-            subtitle=widget_instance.instance_id,
-            detail="Playback transport and session info will land here later.",
-            accent="#FF8E5E",
+        return build_media_controls_widget_host(
+            widget_instance=widget_instance,
+            widget_definition=widget_definition,
             footer=self._build_metadata_footer(widget_definition),
         )
 
