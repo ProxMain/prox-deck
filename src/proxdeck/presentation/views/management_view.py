@@ -6,6 +6,9 @@ from proxdeck.application.controllers.management_controller import ManagementCon
 from proxdeck.application.dto.management_state import ManagementState
 from proxdeck.domain.models.screen import Screen
 from proxdeck.domain.value_objects.widget_size import SIZE_PRESET_DIMENSIONS, WidgetSize
+from proxdeck.presentation.views.widget_definition_summary import (
+    format_widget_definition_summary,
+)
 
 try:
     from PySide6.QtCore import Qt
@@ -351,17 +354,7 @@ class ManagementView(QWidget):
             self._definition_metadata_label.setText("No widget definition selected.")
             return
 
-        capabilities = ", ".join(sorted(definition.capabilities.values)) or "none"
-        self._definition_metadata_label.setText(
-            "Selected widget definition\n"
-            f"ID: {definition.widget_id}\n"
-            f"Kind: {definition.kind.value}\n"
-            f"Version: {definition.version}\n"
-            f"Min app version: {definition.compatibility.minimum_app_version}\n"
-            f"Distribution: {definition.install_metadata.distribution}\n"
-            f"Installation scope: {definition.install_metadata.installation_scope}\n"
-            f"Capabilities: {capabilities}"
-        )
+        self._definition_metadata_label.setText(format_widget_definition_summary(definition))
 
     def _refresh_instance_metadata(self, instance) -> None:
         if self._instance_metadata_label is None:
