@@ -16,6 +16,11 @@ except ModuleNotFoundError:  # pragma: no cover - optional in headless tests
 class QtScreenRuntimeTargetDetector(RuntimeTargetDetector):
     TARGET_WIDTH = 1920
     TARGET_HEIGHT = 1080
+    DEFAULT_TARGET_NAME_HINTS = (
+        "corsair xeneon edge",
+        "xeneon edge",
+        "xeneon",
+    )
 
     def __init__(
         self,
@@ -28,17 +33,16 @@ class QtScreenRuntimeTargetDetector(RuntimeTargetDetector):
         if override is not None:
             return override
 
+        screens = self._screen_provider()
+        named_target = self._find_named_target(screens)
+        if named_target is not None:
+            return named_target
+
         target_width = int(os.getenv("PROXDECK_TARGET_WIDTH", str(self.TARGET_WIDTH)))
         target_height = int(os.getenv("PROXDECK_TARGET_HEIGHT", str(self.TARGET_HEIGHT)))
-        for screen in self._screen_provider():
+        for screen in screens:
             if screen.width == target_width and screen.height == target_height:
-                return RuntimeTarget(
-                    monitor_name=screen.name,
-                    width=screen.width,
-                    height=screen.height,
-                    x=screen.x,
-                    y=screen.y,
-                )
+                return self._build_runtime_target(screen)
         return None
 
     def _read_override_target(self) -> RuntimeTarget | None:
@@ -77,3 +81,33 @@ class QtScreenRuntimeTargetDetector(RuntimeTargetDetector):
                 )
             )
         return snapshots
+
+    def _find_named_target(self, screens: list[ScreenSnapshot]) -> RuntimeTarget | None:
+        for name_hint in self._read_target_name_hints():
+            lowered_hint = name_hint.lower()
+            for screen in screens:
+                if lowered_hint in screen.name.lower():
+                    return self._build_runtime_target(screen)
+        return None
+
+    def _read_target_name_hints(self) -> tuple[str, ...]:
+        configured_hints = os.getenv("PROXDECK_TARGET_MONITOR_NAMES")
+        if configured_hints:
+            hints = tuple(
+                hint.strip()
+                for hint in configured_hints.split(",")
+                if hint.strip()
+            )
+            if hints:
+                return hints
+        return self.DEFAULT_TARGET_NAME_HINTS
+
+    @staticmethod
+    def _build_runtime_target(screen: ScreenSnapshot) -> RuntimeTarget:
+        return RuntimeTarget(
+            monitor_name=screen.name,
+            width=screen.width,
+            height=screen.height,
+            x=screen.x,
+            y=screen.y,
+        )

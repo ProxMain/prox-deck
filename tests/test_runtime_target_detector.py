@@ -23,6 +23,23 @@ def test_runtime_target_detector_matches_screen_by_resolution() -> None:
     assert target.x == 2560
 
 
+def test_runtime_target_detector_prefers_matching_screen_name() -> None:
+    detector = QtScreenRuntimeTargetDetector(
+        screen_provider=lambda: [
+            ScreenSnapshot(name="Primary", width=1920, height=1080, x=0, y=0),
+            ScreenSnapshot(name="CORSAIR Xeneon Edge", width=1600, height=480, x=1920, y=0),
+        ]
+    )
+
+    target = detector.detect_target()
+
+    assert target is not None
+    assert target.monitor_name == "CORSAIR Xeneon Edge"
+    assert target.width == 1600
+    assert target.height == 480
+    assert target.x == 1920
+
+
 def test_runtime_target_detector_returns_none_when_no_matching_screen() -> None:
     detector = QtScreenRuntimeTargetDetector(
         screen_provider=lambda: [
@@ -36,6 +53,7 @@ def test_runtime_target_detector_returns_none_when_no_matching_screen() -> None:
 def test_runtime_target_detector_prefers_explicit_override() -> None:
     original_env = {
         "PROXDECK_DETECTED_MONITOR": os.getenv("PROXDECK_DETECTED_MONITOR"),
+        "PROXDECK_TARGET_MONITOR_NAMES": os.getenv("PROXDECK_TARGET_MONITOR_NAMES"),
         "PROXDECK_TARGET_WIDTH": os.getenv("PROXDECK_TARGET_WIDTH"),
         "PROXDECK_TARGET_HEIGHT": os.getenv("PROXDECK_TARGET_HEIGHT"),
         "PROXDECK_TARGET_X": os.getenv("PROXDECK_TARGET_X"),
@@ -63,3 +81,27 @@ def test_runtime_target_detector_prefers_explicit_override() -> None:
     assert target.height == 720
     assert target.x == 100
     assert target.y == 200
+
+
+def test_runtime_target_detector_uses_configured_name_hints() -> None:
+    original_env = os.getenv("PROXDECK_TARGET_MONITOR_NAMES")
+    os.environ["PROXDECK_TARGET_MONITOR_NAMES"] = "Side Panel,Desk Screen"
+
+    try:
+        detector = QtScreenRuntimeTargetDetector(
+            screen_provider=lambda: [
+                ScreenSnapshot(name="Primary", width=2560, height=1440, x=0, y=0),
+                ScreenSnapshot(name="Desk Screen 2", width=1024, height=600, x=2560, y=0),
+            ]
+        )
+        target = detector.detect_target()
+    finally:
+        if original_env is None:
+            os.environ.pop("PROXDECK_TARGET_MONITOR_NAMES", None)
+        else:
+            os.environ["PROXDECK_TARGET_MONITOR_NAMES"] = original_env
+
+    assert target is not None
+    assert target.monitor_name == "Desk Screen 2"
+    assert target.width == 1024
+    assert target.height == 600
