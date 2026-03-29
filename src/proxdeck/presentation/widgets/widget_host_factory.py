@@ -4,6 +4,7 @@ from typing import Callable
 
 from proxdeck.domain.models.widget_definition import WidgetDefinition
 from proxdeck.domain.models.widget_instance import WidgetInstance
+from proxdeck.presentation.widgets.web_widget_host import build_web_widget_host
 
 try:
     from PySide6.QtCore import Qt
@@ -152,13 +153,9 @@ class WidgetHostFactory:
         widget_instance: WidgetInstance,
         widget_definition: WidgetDefinition | None,
     ) -> QWidget:
-        url = str(widget_instance.settings.get("url", "https://example.com"))
-        mobile = bool(widget_instance.settings.get("force_mobile", False))
-        return self._build_card(
-            title="Web Widget",
-            subtitle="Mobile view enabled" if mobile else "Desktop view enabled",
-            detail=url,
-            accent="#B58CFF",
+        return build_web_widget_host(
+            widget_instance=widget_instance,
+            widget_definition=widget_definition,
             footer=self._build_metadata_footer(widget_definition),
         )
 

@@ -1,0 +1,155 @@
+from __future__ import annotations
+
+from urllib.parse import urlparse
+
+from proxdeck.domain.models.widget_definition import WidgetDefinition
+from proxdeck.domain.models.widget_instance import WidgetInstance
+
+try:
+    from PySide6.QtCore import QUrl, Qt
+    from PySide6.QtGui import QColor
+    from PySide6.QtWebEngineCore import QWebEnginePage, QWebEngineProfile, QWebEngineSettings
+    from PySide6.QtWebEngineWidgets import QWebEngineView
+    from PySide6.QtWidgets import QFrame, QLabel, QVBoxLayout, QWidget
+except ModuleNotFoundError:  # pragma: no cover - optional during headless tests
+    QUrl = object
+    Qt = object
+    QColor = object
+    QWebEnginePage = object
+    QWebEngineProfile = object
+    QWebEngineSettings = object
+    QWebEngineView = object
+    QFrame = object
+    QLabel = object
+    QVBoxLayout = object
+    QWidget = object
+
+
+MOBILE_USER_AGENT = (
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) "
+    "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 "
+    "Mobile/15E148 Safari/604.1"
+)
+
+
+def normalize_web_widget_url(raw_url: object) -> str:
+    candidate = str(raw_url or "").strip()
+    if not candidate:
+        return "https://example.com"
+
+    parsed = urlparse(candidate)
+    if parsed.scheme:
+        return candidate
+    return f"https://{candidate}"
+
+
+def build_web_widget_user_agent(force_mobile: bool) -> str | None:
+    if force_mobile:
+        return MOBILE_USER_AGENT
+    return None
+
+
+def build_web_widget_host(
+    widget_instance: WidgetInstance,
+    widget_definition: WidgetDefinition | None,
+    footer: str,
+) -> QWidget:
+    if QWebEngineView is object or Qt is object:
+        return _build_browser_unavailable_card(widget_instance, footer)
+
+    url = normalize_web_widget_url(widget_instance.settings.get("url"))
+    mobile = bool(widget_instance.settings.get("force_mobile", False))
+
+    card = QFrame()
+    card.setFrameStyle(QFrame.Shape.Box | QFrame.Shadow.Plain)
+    card.setStyleSheet(
+        "QFrame {"
+        "background: #0B1119;"
+        "border: 2px solid #B58CFF;"
+        "border-radius: 14px;"
+        "}"
+        "QLabel { color: #E7EEF7; }"
+    )
+
+    layout = QVBoxLayout(card)
+    layout.setContentsMargins(8, 8, 8, 8)
+    layout.setSpacing(8)
+
+    title_label = QLabel("Web Widget")
+    title_label.setStyleSheet("font-size: 18px; font-weight: 700; color: #F4EDFF;")
+    layout.addWidget(title_label)
+
+    subtitle_label = QLabel("Mobile view enabled" if mobile else "Desktop view enabled")
+    subtitle_label.setStyleSheet("font-size: 12px; color: #B9A2E9;")
+    layout.addWidget(subtitle_label)
+
+    browser_view = QWebEngineView(card)
+    browser_view.setPage(_build_browser_page(card, mobile))
+    browser_view.page().setBackgroundColor(QColor("#0F1722"))
+    browser_view.setUrl(QUrl(url))
+    layout.addWidget(browser_view, 1)
+
+    url_label = QLabel(url)
+    url_label.setWordWrap(True)
+    url_label.setStyleSheet("font-size: 11px; color: #96A9BF;")
+    layout.addWidget(url_label)
+
+    footer_label = QLabel(footer)
+    footer_label.setWordWrap(True)
+    footer_label.setStyleSheet("font-size: 11px; color: #89A0B8;")
+    layout.addWidget(footer_label)
+
+    return card
+
+
+def _build_browser_page(parent: QWidget, force_mobile: bool) -> QWebEnginePage:
+    profile = QWebEngineProfile(parent)
+    user_agent = build_web_widget_user_agent(force_mobile)
+    if user_agent is not None:
+        profile.setHttpUserAgent(user_agent)
+
+    settings = profile.settings()
+    settings.setAttribute(QWebEngineSettings.WebAttribute.FullScreenSupportEnabled, False)
+    settings.setAttribute(QWebEngineSettings.WebAttribute.PluginsEnabled, False)
+    settings.setAttribute(QWebEngineSettings.WebAttribute.JavascriptCanOpenWindows, False)
+    return QWebEnginePage(profile, parent)
+
+
+def _build_browser_unavailable_card(
+    widget_instance: WidgetInstance,
+    footer: str,
+) -> QWidget:
+    url = normalize_web_widget_url(widget_instance.settings.get("url"))
+    mobile = bool(widget_instance.settings.get("force_mobile", False))
+    card = QFrame()
+    card.setFrameStyle(QFrame.Shape.Box | QFrame.Shadow.Plain)
+    card.setStyleSheet(
+        "QFrame {"
+        "background: #101822;"
+        "border: 2px solid #B58CFF;"
+        "border-radius: 14px;"
+        "padding: 12px;"
+        "}"
+        "QLabel { color: #E7EEF7; }"
+    )
+    layout = QVBoxLayout(card)
+    layout.setSpacing(8)
+    title_label = QLabel("Web Widget")
+    title_label.setStyleSheet("font-size: 20px; font-weight: 700;")
+    layout.addWidget(title_label)
+    subtitle_label = QLabel("Mobile view enabled" if mobile else "Desktop view enabled")
+    subtitle_label.setStyleSheet("font-size: 13px; color: #9DB1C7;")
+    layout.addWidget(subtitle_label)
+    detail_label = QLabel(
+        "Embedded browser support is unavailable in this environment.\n"
+        f"Target URL: {url}"
+    )
+    detail_label.setWordWrap(True)
+    detail_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+    layout.addWidget(detail_label)
+    footer_label = QLabel(footer)
+    footer_label.setWordWrap(True)
+    footer_label.setStyleSheet("font-size: 11px; color: #89A0B8;")
+    layout.addWidget(footer_label)
+    layout.addStretch(1)
+    return card
