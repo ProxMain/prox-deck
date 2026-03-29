@@ -88,6 +88,11 @@ class RuntimeWindow(QMainWindow):
         self._dashboard_grid: QGridLayout | None = None
         self._definition_metadata_label: QLabel | None = None
         self._instance_metadata_label: QLabel | None = None
+        self._management_status_label: QLabel | None = None
+        self._add_widget_button: QPushButton | None = None
+        self._suggest_placement_button: QPushButton | None = None
+        self._remove_widget_button: QPushButton | None = None
+        self._save_web_button: QPushButton | None = None
 
         self._configure_window()
         self._build_ui()
@@ -185,6 +190,10 @@ class RuntimeWindow(QMainWindow):
         self._definition_metadata_label.setWordWrap(True)
         layout.addWidget(self._definition_metadata_label)
 
+        self._management_status_label = QLabel()
+        self._management_status_label.setWordWrap(True)
+        layout.addWidget(self._management_status_label)
+
         placement_layout = QHBoxLayout()
         self._column_input = self._build_spin_box(0, 2)
         self._row_input = self._build_spin_box(0, 1)
@@ -200,13 +209,13 @@ class RuntimeWindow(QMainWindow):
         placement_layout.addWidget(self._height_input)
         layout.addLayout(placement_layout)
 
-        add_button = QPushButton("Add Widget")
-        add_button.clicked.connect(self._handle_add_widget)
-        layout.addWidget(add_button)
+        self._add_widget_button = QPushButton("Add Widget")
+        self._add_widget_button.clicked.connect(self._handle_add_widget)
+        layout.addWidget(self._add_widget_button)
 
-        suggest_button = QPushButton("Suggest Placement")
-        suggest_button.clicked.connect(self._handle_suggest_placement)
-        layout.addWidget(suggest_button)
+        self._suggest_placement_button = QPushButton("Suggest Placement")
+        self._suggest_placement_button.clicked.connect(self._handle_suggest_placement)
+        layout.addWidget(self._suggest_placement_button)
 
         self._widget_instance_list = QListWidget()
         self._widget_instance_list.currentItemChanged.connect(self._load_web_widget_settings)
@@ -216,9 +225,9 @@ class RuntimeWindow(QMainWindow):
         self._instance_metadata_label.setWordWrap(True)
         layout.addWidget(self._instance_metadata_label)
 
-        remove_button = QPushButton("Remove Selected")
-        remove_button.clicked.connect(self._handle_remove_widget)
-        layout.addWidget(remove_button)
+        self._remove_widget_button = QPushButton("Remove Selected")
+        self._remove_widget_button.clicked.connect(self._handle_remove_widget)
+        layout.addWidget(self._remove_widget_button)
 
         self._web_url_input = QLineEdit()
         self._web_url_input.setPlaceholderText("https://example.com")
@@ -227,9 +236,9 @@ class RuntimeWindow(QMainWindow):
         layout.addWidget(self._web_url_input)
         layout.addWidget(self._web_mobile_checkbox)
 
-        save_web_button = QPushButton("Save Web Settings")
-        save_web_button.clicked.connect(self._handle_save_web_settings)
-        layout.addWidget(save_web_button)
+        self._save_web_button = QPushButton("Save Web Settings")
+        self._save_web_button.clicked.connect(self._handle_save_web_settings)
+        layout.addWidget(self._save_web_button)
 
         self._refresh_management_instances()
         self._apply_selected_size_preset()
@@ -315,6 +324,7 @@ class RuntimeWindow(QMainWindow):
         if screen is None:
             return
 
+        self._apply_management_screen_state(screen)
         for instance in screen.layout.widget_instances:
             item = QListWidgetItem(
                 f"{instance.widget_id} @ ({instance.placement.column}, {instance.placement.row}) "
@@ -597,3 +607,41 @@ class RuntimeWindow(QMainWindow):
             ),
             None,
         )
+
+    def _apply_management_screen_state(self, screen: Screen) -> None:
+        editable = screen.is_available()
+        for widget in (
+            self._management_widget_selector,
+            self._size_preset_selector,
+            self._column_input,
+            self._row_input,
+            self._width_input,
+            self._height_input,
+            self._widget_instance_list,
+            self._web_url_input,
+            self._web_mobile_checkbox,
+            self._add_widget_button,
+            self._suggest_placement_button,
+            self._remove_widget_button,
+            self._save_web_button,
+        ):
+            if widget is not None:
+                widget.setEnabled(editable)
+
+        if self._management_status_label is not None:
+            self._management_status_label.setText(self._build_management_status_text(screen))
+
+        if not editable:
+            if self._web_url_input is not None:
+                self._web_url_input.clear()
+            if self._web_mobile_checkbox is not None:
+                self._web_mobile_checkbox.setChecked(False)
+            self._refresh_instance_metadata(None)
+
+    @staticmethod
+    def _build_management_status_text(screen: Screen) -> str:
+        if screen.is_available():
+            return f"{screen.name} is editable."
+        if screen.availability.value == "soon":
+            return f"{screen.name} is not editable yet. This screen is marked Soon."
+        return f"{screen.name} is locked and not editable."
