@@ -84,6 +84,8 @@ class RuntimeWindow(QMainWindow):
         self._width_input: QSpinBox | None = None
         self._height_input: QSpinBox | None = None
         self._dashboard_grid: QGridLayout | None = None
+        self._definition_metadata_label: QLabel | None = None
+        self._instance_metadata_label: QLabel | None = None
 
         self._configure_window()
         self._build_ui()
@@ -166,7 +168,14 @@ class RuntimeWindow(QMainWindow):
                 definition.display_name,
                 definition.widget_id,
             )
+        self._management_widget_selector.currentIndexChanged.connect(
+            self._refresh_definition_metadata
+        )
         layout.addWidget(self._management_widget_selector)
+
+        self._definition_metadata_label = QLabel()
+        self._definition_metadata_label.setWordWrap(True)
+        layout.addWidget(self._definition_metadata_label)
 
         placement_layout = QHBoxLayout()
         self._column_input = self._build_spin_box(0, 2)
@@ -191,6 +200,10 @@ class RuntimeWindow(QMainWindow):
         self._widget_instance_list.currentItemChanged.connect(self._load_web_widget_settings)
         layout.addWidget(self._widget_instance_list)
 
+        self._instance_metadata_label = QLabel()
+        self._instance_metadata_label.setWordWrap(True)
+        layout.addWidget(self._instance_metadata_label)
+
         remove_button = QPushButton("Remove Selected")
         remove_button.clicked.connect(self._handle_remove_widget)
         layout.addWidget(remove_button)
@@ -207,6 +220,7 @@ class RuntimeWindow(QMainWindow):
         layout.addWidget(save_web_button)
 
         self._refresh_management_instances()
+        self._refresh_definition_metadata()
         return widget
 
     def _create_runtime_banner(self) -> RuntimeBanner:
@@ -356,6 +370,7 @@ class RuntimeWindow(QMainWindow):
         if current_item is None:
             self._web_url_input.clear()
             self._web_mobile_checkbox.setChecked(False)
+            self._refresh_instance_metadata(None)
             return
 
         screen_id = self._management_screen_selector.currentData()
@@ -374,10 +389,12 @@ class RuntimeWindow(QMainWindow):
         if instance is None or instance.widget_id != "web":
             self._web_url_input.clear()
             self._web_mobile_checkbox.setChecked(False)
+            self._refresh_instance_metadata(instance)
             return
 
         self._web_url_input.setText(str(instance.settings.get("url", "")))
         self._web_mobile_checkbox.setChecked(bool(instance.settings.get("force_mobile", False)))
+        self._refresh_instance_metadata(instance)
 
     def _handle_save_web_settings(self) -> None:
         if (
@@ -439,7 +456,8 @@ class RuntimeWindow(QMainWindow):
         occupied_cells = set()
         for instance in screen.layout.widget_instances:
             occupied_cells.update(instance.placement.cells())
-            widget = self._widget_host_factory.create_widget(instance)
+            definition = self._find_widget_definition(instance.widget_id)
+            widget = self._widget_host_factory.create_widget(instance, definition)
             self._dashboard_grid.addWidget(
                 widget,
                 instance.placement.row,
@@ -465,3 +483,58 @@ class RuntimeWindow(QMainWindow):
                     "}"
                 )
                 self._dashboard_grid.addWidget(cell, row, column)
+
+    def _refresh_definition_metadata(self, *_args) -> None:
+        if self._management_widget_selector is None or self._definition_metadata_label is None:
+            return
+
+        definition = self._find_widget_definition(self._management_widget_selector.currentData())
+        if definition is None:
+            self._definition_metadata_label.setText("No widget definition selected.")
+            return
+
+        capabilities = ", ".join(sorted(definition.capabilities.values)) or "none"
+        self._definition_metadata_label.setText(
+            "Selected widget definition\n"
+            f"ID: {definition.widget_id}\n"
+            f"Kind: {definition.kind.value}\n"
+            f"Version: {definition.version}\n"
+            f"Min app version: {definition.compatibility.minimum_app_version}\n"
+            f"Distribution: {definition.install_metadata.distribution}\n"
+            f"Installation scope: {definition.install_metadata.installation_scope}\n"
+            f"Capabilities: {capabilities}"
+        )
+
+    def _refresh_instance_metadata(self, instance) -> None:
+        if self._instance_metadata_label is None:
+            return
+
+        if instance is None:
+            self._instance_metadata_label.setText("No widget instance selected.")
+            return
+
+        definition = self._find_widget_definition(instance.widget_id)
+        if definition is None:
+            self._instance_metadata_label.setText(
+                f"Selected instance\nID: {instance.instance_id}\nDefinition metadata unavailable."
+            )
+            return
+
+        self._instance_metadata_label.setText(
+            "Selected widget instance\n"
+            f"Instance: {instance.instance_id}\n"
+            f"Widget: {definition.display_name}\n"
+            f"Entrypoint: {definition.entrypoint}\n"
+            f"Distribution: {definition.install_metadata.distribution}\n"
+            f"Installation scope: {definition.install_metadata.installation_scope}"
+        )
+
+    def _find_widget_definition(self, widget_id: str):
+        return next(
+            (
+                definition
+                for definition in self._management_state.widget_definitions
+                if definition.widget_id == widget_id
+            ),
+            None,
+        )

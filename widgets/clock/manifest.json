@@ -3,6 +3,13 @@
   "display_name": "Clock",
   "version": "1.0.0",
   "kind": "builtin",
+  "compatibility": {
+    "minimum_app_version": "0.1.0"
+  },
+  "install_metadata": {
+    "distribution": "core",
+    "installation_scope": "bundled"
+  },
   "capabilities": [],
   "entrypoint": "widgets.clock",
   "supports_multiple_instances": true

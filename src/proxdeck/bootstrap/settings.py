@@ -3,6 +3,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from proxdeck.domain.value_objects.app_version import AppVersion
+
+
+APP_VERSION = AppVersion.parse("0.1.0")
+
 
 @dataclass(frozen=True)
 class AppPaths:

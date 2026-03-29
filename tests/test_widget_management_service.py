@@ -7,6 +7,10 @@ from proxdeck.domain.contracts.screen_repository import ScreenRepository
 from proxdeck.domain.models.screen import Screen
 from proxdeck.domain.policies.layout_policy import LayoutPolicy
 from proxdeck.domain.policies.screen_availability_policy import ScreenAvailabilityPolicy
+from proxdeck.domain.policies.widget_compatibility_policy import (
+    WidgetCompatibilityPolicy,
+)
+from proxdeck.domain.value_objects.app_version import AppVersion
 from proxdeck.infrastructure.widgets.discovered_widget_catalog import (
     DiscoveredWidgetCatalog,
 )
@@ -35,7 +39,9 @@ def build_management_service() -> WidgetManagementService:
         widget_discovery=FilesystemWidgetDiscovery(
             roots=(project_root / "widgets", project_root / "installable_widgets"),
             loader=JsonWidgetManifestLoader(),
-        )
+        ),
+        current_app_version=AppVersion.parse("0.1.0"),
+        compatibility_policy=WidgetCompatibilityPolicy(),
     )
     screen_service = ScreenService(
         screen_repository=InMemoryScreenRepository(),

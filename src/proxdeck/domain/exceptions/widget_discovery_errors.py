@@ -22,3 +22,15 @@ class DuplicateWidgetIdError(WidgetDiscoveryError):
     def __init__(self, widget_id: str) -> None:
         super().__init__(f"Duplicate widget id discovered: {widget_id}")
         self.widget_id = widget_id
+
+
+class IncompatibleWidgetError(WidgetDiscoveryError):
+    """Raised when a widget requires a newer app version than supported."""
+
+    def __init__(self, widget_id: str, required_version: str, current_version: str) -> None:
+        super().__init__(
+            f"Widget '{widget_id}' requires app version {required_version} but current version is {current_version}"
+        )
+        self.widget_id = widget_id
+        self.required_version = required_version
+        self.current_version = current_version

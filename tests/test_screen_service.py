@@ -4,6 +4,10 @@ from proxdeck.application.services.default_screen_factory import DefaultScreenFa
 from proxdeck.application.services.screen_service import ScreenService
 from proxdeck.domain.contracts.screen_repository import ScreenRepository
 from proxdeck.domain.models.screen import Screen
+from proxdeck.domain.policies.widget_compatibility_policy import (
+    WidgetCompatibilityPolicy,
+)
+from proxdeck.domain.value_objects.app_version import AppVersion
 from proxdeck.domain.models.widget_instance import WidgetInstance
 from proxdeck.domain.policies.layout_policy import LayoutPolicy
 from proxdeck.domain.policies.screen_availability_policy import ScreenAvailabilityPolicy
@@ -36,7 +40,9 @@ def build_widget_catalog() -> DiscoveredWidgetCatalog:
         widget_discovery=FilesystemWidgetDiscovery(
             roots=(project_root / "widgets", project_root / "installable_widgets"),
             loader=JsonWidgetManifestLoader(),
-        )
+        ),
+        current_app_version=AppVersion.parse("0.1.0"),
+        compatibility_policy=WidgetCompatibilityPolicy(),
     )
 
 

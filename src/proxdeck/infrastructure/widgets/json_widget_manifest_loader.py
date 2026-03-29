@@ -4,8 +4,11 @@ import json
 from pathlib import Path
 
 from proxdeck.domain.exceptions.widget_discovery_errors import WidgetManifestLoadError
+from proxdeck.domain.models.widget_compatibility import WidgetCompatibility
+from proxdeck.domain.models.widget_install_metadata import WidgetInstallMetadata
 from proxdeck.domain.models.widget_kind import WidgetKind
 from proxdeck.domain.models.widget_manifest import WidgetManifest
+from proxdeck.domain.value_objects.app_version import AppVersion
 from proxdeck.domain.value_objects.capability_set import CapabilitySet
 
 
@@ -18,6 +21,17 @@ class JsonWidgetManifestLoader:
                 display_name=str(payload["display_name"]),
                 version=str(payload["version"]),
                 kind=WidgetKind(str(payload["kind"])),
+                compatibility=WidgetCompatibility(
+                    minimum_app_version=AppVersion.parse(
+                        str(payload["compatibility"]["minimum_app_version"])
+                    )
+                ),
+                install_metadata=WidgetInstallMetadata(
+                    distribution=str(payload["install_metadata"]["distribution"]),
+                    installation_scope=str(
+                        payload["install_metadata"]["installation_scope"]
+                    ),
+                ),
                 capabilities=CapabilitySet(
                     values=frozenset(payload.get("capabilities", []))
                 ),
