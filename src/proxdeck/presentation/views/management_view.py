@@ -8,6 +8,7 @@ from proxdeck.application.dto.management_state import ManagementState
 from proxdeck.domain.models.screen import Screen
 from proxdeck.domain.value_objects.widget_size import SIZE_PRESET_DIMENSIONS, WidgetSize
 from proxdeck.presentation.views.layout_preview import LayoutPreviewWidget
+from proxdeck.presentation.views.widget_palette import WidgetPaletteView
 from proxdeck.presentation.views.widget_definition_summary import (
     format_widget_definition_summary,
 )
@@ -78,6 +79,7 @@ class ManagementView(QWidget):
         self._management_screen_selector: QComboBox | None = None
         self._management_widget_selector: QComboBox | None = None
         self._size_preset_selector: QComboBox | None = None
+        self._widget_palette: WidgetPaletteView | None = None
         self._widget_instance_list: QListWidget | None = None
         self._web_url_input: QLineEdit | None = None
         self._web_mobile_checkbox: QCheckBox | None = None
@@ -126,7 +128,7 @@ class ManagementView(QWidget):
         content_layout.addLayout(left_column, 3)
         content_layout.addLayout(right_column, 2)
 
-        selection_card = self._build_section_card("Screen & Widget Selection")
+        selection_card = self._build_section_card("Screen & Palette")
         selection_layout = QVBoxLayout(selection_card)
         selection_layout.setSpacing(10)
 
@@ -149,15 +151,19 @@ class ManagementView(QWidget):
         self._management_widget_selector.currentIndexChanged.connect(
             self._refresh_definition_metadata
         )
-        selection_layout.addWidget(QLabel("Widget Type"))
-        selection_layout.addWidget(self._management_widget_selector)
+        self._management_widget_selector.hide()
 
         self._size_preset_selector = QComboBox()
         for preset in SIZE_PRESET_DIMENSIONS:
             self._size_preset_selector.addItem(preset, preset)
         self._size_preset_selector.currentIndexChanged.connect(self._apply_selected_size_preset)
-        selection_layout.addWidget(QLabel("Size Preset"))
-        selection_layout.addWidget(self._size_preset_selector)
+        self._size_preset_selector.hide()
+
+        palette_label = QLabel("Widget Palette")
+        palette_label.setStyleSheet("font-size: 13px; font-weight: 700; color: #EAF0F6;")
+        selection_layout.addWidget(palette_label)
+        self._widget_palette = WidgetPaletteView(on_select_widget=self._handle_palette_select)
+        selection_layout.addWidget(self._widget_palette)
 
         self._definition_metadata_label = QLabel()
         self._definition_metadata_label.setWordWrap(True)
@@ -207,6 +213,7 @@ class ManagementView(QWidget):
             on_move_instance=self._handle_preview_move,
             on_resize_instance=self._handle_preview_resize,
             on_select_instance=self._handle_preview_select,
+            on_add_widget=self._handle_preview_add,
             render_widget_preview=lambda instance, definition: self._widget_host_factory.create_widget(
                 instance,
                 definition,
@@ -288,6 +295,7 @@ class ManagementView(QWidget):
         self._refresh_management_instances()
         self._apply_selected_size_preset()
         self._refresh_definition_metadata()
+        self._refresh_palette()
 
         self.setStyleSheet(
             "QWidget { background: #111820; color: #EAF0F6; }"
@@ -338,6 +346,7 @@ class ManagementView(QWidget):
         self._refresh_management_state()
         self._refresh_management_instances()
         self._refresh_definition_metadata()
+        self._refresh_palette()
 
     def _notify_state_changed(self) -> None:
         if self._on_state_changed is not None:
@@ -345,6 +354,17 @@ class ManagementView(QWidget):
 
     def _refresh_management_state(self) -> None:
         self._management_state = self._management_controller.load_management_state()
+
+    def _refresh_palette(self) -> None:
+        if self._widget_palette is None:
+            return
+        selected_widget_id = None
+        if self._management_widget_selector is not None:
+            selected_widget_id = self._management_widget_selector.currentData()
+        self._widget_palette.set_definitions(
+            self._management_state.widget_definitions,
+            selected_widget_id=selected_widget_id,
+        )
 
     def _refresh_management_instances(self, *_args) -> None:
         if self._management_screen_selector is None or self._widget_instance_list is None:
@@ -391,6 +411,15 @@ class ManagementView(QWidget):
         self.refresh()
         self._notify_state_changed()
         self._refresh_layout_preview(self._current_screen())
+
+    def _handle_palette_select(self, widget_id: str) -> None:
+        if self._management_widget_selector is None:
+            return
+        for index in range(self._management_widget_selector.count()):
+            if self._management_widget_selector.itemData(index) == widget_id:
+                self._management_widget_selector.setCurrentIndex(index)
+                self._refresh_palette()
+                return
 
     def _handle_suggest_placement(self) -> None:
         if (
@@ -751,6 +780,25 @@ class ManagementView(QWidget):
         self.refresh()
         self._notify_state_changed()
         self._handle_preview_select(instance_id)
+
+    def _handle_preview_add(self, widget_id: str, column: int, row: int) -> None:
+        if self._management_screen_selector is None:
+            return
+        try:
+            self._management_controller.add_widget_instance_from_preset(
+                screen_id=self._management_screen_selector.currentData(),
+                widget_id=widget_id,
+                column=column,
+                row=row,
+                size_preset="1/6",
+            )
+        except ValueError as error:
+            QMessageBox.warning(self, "Add rejected", str(error))
+            self._refresh_layout_preview(self._current_screen())
+            return
+        self._handle_palette_select(widget_id)
+        self.refresh()
+        self._notify_state_changed()
 
     @staticmethod
     def build_screen_ui_state(screen: Screen) -> ManagementScreenUiState:

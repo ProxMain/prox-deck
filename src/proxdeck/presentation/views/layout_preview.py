@@ -30,12 +30,14 @@ class LayoutPreviewWidget(QFrame):
         on_move_instance: Callable[[str, int, int], None],
         on_resize_instance: Callable[[str, str], None],
         on_select_instance: Callable[[str], None],
+        on_add_widget: Callable[[str, int, int], None],
         render_widget_preview: Callable[[WidgetInstance, WidgetDefinition | None], QWidget],
     ) -> None:
         super().__init__()
         self._on_move_instance = on_move_instance
         self._on_resize_instance = on_resize_instance
         self._on_select_instance = on_select_instance
+        self._on_add_widget = on_add_widget
         self._render_widget_preview = render_widget_preview
         self._screen: Screen | None = None
         self._definitions: dict[str, WidgetDefinition] = {}
@@ -62,7 +64,10 @@ class LayoutPreviewWidget(QFrame):
         self._rebuild()
 
     def dragEnterEvent(self, event) -> None:  # type: ignore[override]
-        if event.mimeData().hasFormat("application/x-proxdeck-instance"):
+        if (
+            event.mimeData().hasFormat("application/x-proxdeck-instance")
+            or event.mimeData().hasFormat("application/x-proxdeck-widget")
+        ):
             event.acceptProposedAction()
             return
         event.ignore()
@@ -72,12 +77,20 @@ class LayoutPreviewWidget(QFrame):
             event.ignore()
             return
 
-        data = bytes(event.mimeData().data("application/x-proxdeck-instance")).decode("utf-8")
         cell = self._cell_at_position(event.position().toPoint())
         if cell is None:
             event.ignore()
             return
-        self._on_move_instance(data, cell[0], cell[1])
+
+        if event.mimeData().hasFormat("application/x-proxdeck-instance"):
+            data = bytes(event.mimeData().data("application/x-proxdeck-instance")).decode("utf-8")
+            self._on_move_instance(data, cell[0], cell[1])
+        elif event.mimeData().hasFormat("application/x-proxdeck-widget"):
+            data = bytes(event.mimeData().data("application/x-proxdeck-widget")).decode("utf-8")
+            self._on_add_widget(data, cell[0], cell[1])
+        else:
+            event.ignore()
+            return
         event.acceptProposedAction()
 
     def resizeEvent(self, event) -> None:  # type: ignore[override]
