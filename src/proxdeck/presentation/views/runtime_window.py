@@ -3,6 +3,7 @@ from __future__ import annotations
 from proxdeck.application.controllers.management_controller import ManagementController
 from proxdeck.application.controllers.runtime_controller import RuntimeController
 from proxdeck.application.dto.runtime_state import RuntimeState
+from proxdeck.bootstrap.settings import APP_RELEASE
 from proxdeck.domain.models.screen import Screen
 from proxdeck.presentation.widgets.widget_host_factory import WidgetHostFactory
 
@@ -68,7 +69,7 @@ class RuntimeWindow(QMainWindow):
         self._apply_runtime_target()
 
     def _configure_window(self) -> None:
-        self.setWindowTitle("Prox Deck")
+        self.setWindowTitle(f"Prox Deck {APP_RELEASE}")
         self.setMinimumSize(1200, 700)
         self.setWindowFlag(Qt.WindowType.FramelessWindowHint, True)
         self.setAttribute(Qt.WidgetAttribute.WA_AcceptTouchEvents, True)

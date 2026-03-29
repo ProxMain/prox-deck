@@ -34,7 +34,7 @@ def test_discovered_definition_exposes_install_metadata() -> None:
             ),
             loader=JsonWidgetManifestLoader(),
         ),
-        current_app_version=AppVersion.parse("0.1.0"),
+        current_app_version=AppVersion.parse("1.0.0"),
         compatibility_policy=WidgetCompatibilityPolicy(),
     )
 
@@ -42,7 +42,7 @@ def test_discovered_definition_exposes_install_metadata() -> None:
 
     assert definition.install_metadata.distribution == "core"
     assert definition.install_metadata.installation_scope == "bundled"
-    assert str(definition.compatibility.minimum_app_version) == "0.1.0"
+    assert str(definition.compatibility.minimum_app_version) == "1.0.0"
 
 
 def test_discovered_definition_exposes_installable_widget_metadata() -> None:
@@ -61,7 +61,7 @@ def test_discovered_definition_exposes_installable_widget_metadata() -> None:
             ),
             loader=JsonWidgetManifestLoader(),
         ),
-        current_app_version=AppVersion.parse("0.1.0"),
+        current_app_version=AppVersion.parse("1.0.0"),
         compatibility_policy=WidgetCompatibilityPolicy(),
     )
 
@@ -89,7 +89,7 @@ def test_widget_host_factory_formats_metadata_footer() -> None:
             ),
             loader=JsonWidgetManifestLoader(),
         ),
-        current_app_version=AppVersion.parse("0.1.0"),
+        current_app_version=AppVersion.parse("1.0.0"),
         compatibility_policy=WidgetCompatibilityPolicy(),
     )
 
@@ -97,7 +97,7 @@ def test_widget_host_factory_formats_metadata_footer() -> None:
     footer = WidgetHostFactory()._build_metadata_footer(definition)
 
     assert "Kind: builtin" in footer
-    assert "Min app: 0.1.0" in footer
+    assert "Min app: 1.0.0" in footer
     assert "Distribution: core" in footer
     assert "Scope: bundled" in footer
     assert "Capabilities: network" in footer

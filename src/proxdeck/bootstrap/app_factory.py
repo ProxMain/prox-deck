@@ -51,7 +51,11 @@ class AppFactory:
                         expected_kind=WidgetKind.BUILTIN,
                     ),
                     WidgetDiscoveryRoot(
-                        path=self._paths.installable_widgets_root,
+                        path=self._paths.bundled_installable_widgets_root,
+                        expected_kind=WidgetKind.INSTALLABLE,
+                    ),
+                    WidgetDiscoveryRoot(
+                        path=self._paths.user_installable_widgets_root,
                         expected_kind=WidgetKind.INSTALLABLE,
                     ),
                 ),

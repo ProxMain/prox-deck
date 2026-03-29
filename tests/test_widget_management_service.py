@@ -59,7 +59,7 @@ def build_management_service() -> WidgetManagementService:
             ),
             loader=JsonWidgetManifestLoader(),
         ),
-        current_app_version=AppVersion.parse("0.1.0"),
+        current_app_version=AppVersion.parse("1.0.0"),
         compatibility_policy=WidgetCompatibilityPolicy(),
     )
     layout_policy = LayoutPolicy()

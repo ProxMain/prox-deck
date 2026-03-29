@@ -5,6 +5,7 @@ from collections.abc import Callable
 from proxdeck.application.controllers.management_controller import ManagementController
 from proxdeck.application.controllers.runtime_controller import RuntimeController
 from proxdeck.application.dto.runtime_state import RuntimeState
+from proxdeck.bootstrap.settings import APP_RELEASE
 from proxdeck.presentation.views.configuration_window import ConfigurationWindow
 from proxdeck.presentation.views.runtime_window import RuntimeWindow
 
@@ -102,7 +103,7 @@ class ProxDeckApplication:
         self._add_tray_action(tray_menu, "Quit", QApplication.quit)
 
         self._tray_icon = QSystemTrayIcon(self._build_tray_icon_asset())
-        self._tray_icon.setToolTip("Prox Deck")
+        self._tray_icon.setToolTip(f"Prox Deck {APP_RELEASE}")
         self._tray_icon.setContextMenu(tray_menu)
         self._tray_icon.activated.connect(self._handle_tray_activation)
         self._tray_icon.show()

@@ -104,7 +104,7 @@ class DefaultScreenFactory:
                             instance_id="streaming-core",
                             widget_id="system-stats",
                             screen_id="streaming",
-                            placement=WidgetPlacement(column=0, row=1, width=3, height=1),
+                            placement=WidgetPlacement(column=0, row=1, width=2, height=1),
                         ),
                     )
                 ),

@@ -103,7 +103,7 @@ def _build_launcher_management_state() -> ManagementState:
         display_name="Launcher",
         version="1.0.0",
         kind=WidgetKind.BUILTIN,
-        compatibility=WidgetCompatibility(minimum_app_version=AppVersion.parse("0.1.0")),
+        compatibility=WidgetCompatibility(minimum_app_version=AppVersion.parse("1.0.0")),
         install_metadata=WidgetInstallMetadata(
             distribution="core",
             installation_scope="bundled",

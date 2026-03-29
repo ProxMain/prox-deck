@@ -28,6 +28,12 @@ class AudioSessionReader(Protocol):
     def __call__(self) -> MediaSessionSnapshot: ...
 
 
+def _build_windows_subprocess_kwargs() -> dict[str, object]:
+    if hasattr(subprocess, "CREATE_NO_WINDOW"):
+        return {"creationflags": subprocess.CREATE_NO_WINDOW}
+    return {}
+
+
 POWERSHELL_MEDIA_SESSION_SCRIPT = """
 $sessionManagerType = [Windows.Media.Control.GlobalSystemMediaTransportControlsSessionManager, Windows.Media.Control, ContentType=WindowsRuntime]
 if ($null -eq $sessionManagerType) {
@@ -202,6 +208,7 @@ def _run_command(command: list[str], timeout: float) -> subprocess.CompletedProc
         capture_output=True,
         text=True,
         timeout=timeout,
+        **_build_windows_subprocess_kwargs(),
     )
 
 

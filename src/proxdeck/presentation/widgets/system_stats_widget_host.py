@@ -36,6 +36,12 @@ except ModuleNotFoundError:  # pragma: no cover - optional during headless tests
     QWidget = object
 
 
+def _build_windows_subprocess_kwargs() -> dict[str, object]:
+    if hasattr(subprocess, "CREATE_NO_WINDOW"):
+        return {"creationflags": subprocess.CREATE_NO_WINDOW}
+    return {}
+
+
 @dataclass(frozen=True)
 class SystemStatsSnapshot:
     cpu_percent: float | None
@@ -338,6 +344,7 @@ class WindowsSystemStatsProvider:
                 text=True,
                 timeout=4.0,
                 check=False,
+                **_build_windows_subprocess_kwargs(),
             )
         except (OSError, subprocess.SubprocessError):
             return self._gpu_fallback_cached_value
@@ -400,6 +407,7 @@ class WindowsSystemStatsProvider:
                 text=True,
                 timeout=4.0,
                 check=False,
+                **_build_windows_subprocess_kwargs(),
             )
         except (OSError, subprocess.SubprocessError):
             return self._lhm_cached_metrics

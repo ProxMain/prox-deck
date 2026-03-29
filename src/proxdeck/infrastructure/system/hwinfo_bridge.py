@@ -14,6 +14,12 @@ HWINFO_HEADER_MAGIC = 0x53695748
 WM_CLOSE = 0x0010
 
 
+def _build_windows_subprocess_kwargs() -> dict[str, object]:
+    if hasattr(subprocess, "CREATE_NO_WINDOW"):
+        return {"creationflags": subprocess.CREATE_NO_WINDOW}
+    return {}
+
+
 @dataclass(frozen=True)
 class HWiNFOSensorEntry:
     sensor_name: str
@@ -176,6 +182,7 @@ class HWiNFOBridge:
                 text=True,
                 timeout=3.0,
                 check=False,
+                **_build_windows_subprocess_kwargs(),
             )
         except (OSError, subprocess.SubprocessError):
             return False
@@ -191,6 +198,7 @@ class HWiNFOBridge:
                 cwd=str(self._exe_path.parent),
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
+                **_build_windows_subprocess_kwargs(),
             )
         except OSError:
             return

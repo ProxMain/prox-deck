@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "kind": "builtin",
   "compatibility": {
-    "minimum_app_version": "0.1.0"
+    "minimum_app_version": "1.0.0"
   },
   "install_metadata": {
     "distribution": "core",

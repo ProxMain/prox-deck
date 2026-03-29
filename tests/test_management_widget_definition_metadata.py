@@ -110,7 +110,7 @@ def _build_definition(
         version="1.0.0",
         kind=kind,
         compatibility=WidgetCompatibility(
-            minimum_app_version=AppVersion.parse("0.1.0")
+            minimum_app_version=AppVersion.parse("1.0.0")
         ),
         install_metadata=WidgetInstallMetadata(
             distribution=distribution,

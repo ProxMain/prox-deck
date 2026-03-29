@@ -4,6 +4,8 @@ from proxdeck.application.services.default_screen_factory import DefaultScreenFa
 from proxdeck.application.services.screen_service import ScreenService
 from proxdeck.domain.contracts.screen_repository import ScreenRepository
 from proxdeck.domain.models.screen import Screen
+from proxdeck.domain.models.screen_availability import ScreenAvailability
+from proxdeck.domain.models.screen_layout import ScreenLayout
 from proxdeck.domain.models.widget_kind import WidgetKind
 from proxdeck.domain.policies.widget_compatibility_policy import (
     WidgetCompatibilityPolicy,
@@ -59,7 +61,7 @@ def build_widget_catalog() -> DiscoveredWidgetCatalog:
             ),
             loader=JsonWidgetManifestLoader(),
         ),
-        current_app_version=AppVersion.parse("0.1.0"),
+        current_app_version=AppVersion.parse("1.0.0"),
         compatibility_policy=WidgetCompatibilityPolicy(),
     )
 
@@ -85,6 +87,17 @@ def test_screen_service_bootstraps_default_screens() -> None:
 
 def test_screen_service_persists_widget_addition() -> None:
     repository = InMemoryScreenRepository()
+    repository.save_screens(
+        [
+            Screen(
+                screen_id="gaming",
+                name="Gaming",
+                availability=ScreenAvailability.AVAILABLE,
+                layout=ScreenLayout(),
+            )
+        ]
+    )
+    repository.save_active_screen_id("gaming")
     service = ScreenService(
         screen_repository=repository,
         widget_catalog=build_widget_catalog(),

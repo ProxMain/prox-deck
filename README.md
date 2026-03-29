@@ -2,6 +2,8 @@
 
 Prox Deck is a PySide6 desktop application for the Corsair Xeneon Edge.
 
+Current release target: `v1.0.0-alpha`
+
 The application is intended as a dedicated second-screen dashboard that runs on the Edge in a widget-based fullscreen runtime, while keeping runtime and management responsibilities structurally separated.
 
 ## Current Status
@@ -48,7 +50,7 @@ Create or activate a virtual environment, install dependencies, then start the a
 
 ```bash
 pip install -e .
-python main.py
+python -m proxdeck
 ```
 
 The current runtime target detector uses environment variables as a safe placeholder instead of real monitor enumeration.
@@ -61,7 +63,7 @@ set PROXDECK_TARGET_WIDTH=1920
 set PROXDECK_TARGET_HEIGHT=1080
 set PROXDECK_TARGET_X=0
 set PROXDECK_TARGET_Y=0
-python main.py
+python -m proxdeck
 ```
 
 If no target monitor is detected, the app stays in a safe windowed fallback.
@@ -71,6 +73,10 @@ If no target monitor is detected, the app stays in a safe windowed fallback.
 ```bash
 python -m pytest -q -p no:cacheprovider
 ```
+
+## Installer Build
+
+Windows release packaging is documented in `docs/release.md`.
 
 ## Notes
 

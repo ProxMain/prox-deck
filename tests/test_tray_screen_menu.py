@@ -78,6 +78,6 @@ def _build_widget_catalog() -> DiscoveredWidgetCatalog:
             ),
             loader=JsonWidgetManifestLoader(),
         ),
-        current_app_version=AppVersion.parse("0.1.0"),
+        current_app_version=AppVersion.parse("1.0.0"),
         compatibility_policy=WidgetCompatibilityPolicy(),
     )

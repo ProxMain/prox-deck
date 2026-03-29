@@ -34,7 +34,7 @@ def test_manifest_loader_reads_builtin_widget_manifest() -> None:
     assert manifest.widget_id == "web"
     assert manifest.kind is WidgetKind.BUILTIN
     assert manifest.capabilities.requires("network")
-    assert str(manifest.compatibility.minimum_app_version) == "0.1.0"
+    assert str(manifest.compatibility.minimum_app_version) == "1.0.0"
     assert manifest.install_metadata.distribution == "core"
 
 
@@ -54,7 +54,7 @@ def test_discovery_catalog_loads_builtin_widget_manifests() -> None:
             ),
             loader=JsonWidgetManifestLoader(),
         ),
-        current_app_version=AppVersion.parse("0.1.0"),
+        current_app_version=AppVersion.parse("1.0.0"),
         compatibility_policy=WidgetCompatibilityPolicy(),
     )
 
@@ -101,7 +101,7 @@ def test_discovery_catalog_rejects_duplicate_widget_ids() -> None:
             "version": "1.0.0",
             "kind": "builtin",
             "compatibility": {
-                "minimum_app_version": "0.1.0"
+                "minimum_app_version": "1.0.0"
             },
             "install_metadata": {
                 "distribution": "core",
@@ -135,7 +135,7 @@ def test_discovery_catalog_rejects_duplicate_widget_ids() -> None:
                     ),
                     loader=JsonWidgetManifestLoader(),
                 ),
-                current_app_version=AppVersion.parse("0.1.0"),
+                current_app_version=AppVersion.parse("1.0.0"),
                 compatibility_policy=WidgetCompatibilityPolicy(),
             )
         except DuplicateWidgetIdError as error:
@@ -185,7 +185,7 @@ def test_discovery_catalog_rejects_incompatible_widget() -> None:
                     ),
                     loader=JsonWidgetManifestLoader(),
                 ),
-                current_app_version=AppVersion.parse("0.1.0"),
+                current_app_version=AppVersion.parse("1.0.0"),
                 compatibility_policy=WidgetCompatibilityPolicy(),
             )
         except IncompatibleWidgetError as error:
@@ -209,7 +209,7 @@ def test_discovery_rejects_installable_kind_in_builtin_root() -> None:
                     "display_name": "Future Widget",
                     "version": "1.0.0",
                     "kind": "installable",
-                    "compatibility": {"minimum_app_version": "0.1.0"},
+                    "compatibility": {"minimum_app_version": "1.0.0"},
                     "install_metadata": {
                         "distribution": "installer",
                         "installation_scope": "custom-directory"
@@ -253,7 +253,7 @@ def test_discovery_rejects_invalid_installable_metadata() -> None:
                     "display_name": "Bad Widget",
                     "version": "1.0.0",
                     "kind": "installable",
-                    "compatibility": {"minimum_app_version": "0.1.0"},
+                    "compatibility": {"minimum_app_version": "1.0.0"},
                     "install_metadata": {
                         "distribution": "core",
                         "installation_scope": "bundled"

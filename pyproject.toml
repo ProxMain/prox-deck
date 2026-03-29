@@ -4,12 +4,23 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "prox-deck"
-version = "0.1.0"
+version = "1.0.0a0"
 description = "Prox Deck runtime foundation for the Corsair Xeneon Edge."
 requires-python = ">=3.11"
 dependencies = [
   "PySide6>=6.7,<7",
 ]
+
+[project.gui-scripts]
+proxdeck = "proxdeck.__main__:main"
+
+[project.optional-dependencies]
+release = [
+  "pyinstaller>=6.6,<7",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
 
 [tool.pytest.ini_options]
 pythonpath = [

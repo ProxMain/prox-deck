@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from proxdeck.application.controllers.management_controller import ManagementController
+from proxdeck.bootstrap.settings import APP_RELEASE
 from proxdeck.presentation.views.management_view import ManagementView
 
 try:
@@ -18,7 +19,7 @@ class ConfigurationWindow(QMainWindow):
         on_state_changed: Callable[[], None] | None = None,
     ) -> None:
         super().__init__()
-        self.setWindowTitle("Prox Deck // Control Room")
+        self.setWindowTitle(f"Prox Deck {APP_RELEASE} // Control Room")
         self.resize(1440, 920)
         self._management_view = ManagementView(
             management_controller=management_controller,
