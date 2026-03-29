@@ -1,0 +1,497 @@
+# Edge Dashboard App — Technical Architecture Outline
+
+## 1. Doel van dit document
+
+Dit document beschrijft de technische basisarchitectuur van de applicatie.
+
+Het doel is om:
+
+- duidelijke verantwoordelijkheden af te bakenen
+- de codebase structureel beheersbaar te houden
+- uitbreiding mogelijk te maken zonder architecturale vervuiling
+- runtime, management en widget-extensibility correct te scheiden
+
+Dit document beschrijft geen concrete features tot op UI-niveau, maar definieert de structurele aanpak die daarop van toepassing is.
+
+---
+
+## 2. Architecturale uitgangspunten
+
+De applicatie volgt een gelaagde architectuur met strikte scheiding van verantwoordelijkheden.
+
+### 2.1 Lagen
+De codebase bestaat logisch uit de volgende lagen:
+
+- Presentation
+- Application
+- Domain
+- Infrastructure
+- Bootstrap
+
+### 2.2 Rol per laag
+
+#### Presentation
+Verantwoordelijk voor:
+
+- PySide6 views
+- widgets/rendering
+- UI events
+- screen selector UI
+- management UI
+- touchvriendelijke interactie
+
+Presentation bevat geen business rules, persistence of platformlogica.
+
+#### Application
+Verantwoordelijk voor:
+
+- use case orchestration
+- screen switching flows
+- widget add/remove flows
+- management actions
+- layout updates
+- capability checks op applicatieniveau
+- samenwerking tussen domain en infrastructure
+
+#### Domain
+Verantwoordelijk voor:
+
+- modellen
+- value objects
+- policies
+- contracts/interfaces
+- validatieregels
+- layoutregels
+- screenregels
+- widgetplaatsingsregels
+
+Domain kent geen PySide6 en geen concrete infrastructuur.
+
+#### Infrastructure
+Verantwoordelijk voor:
+
+- lokale opslag
+- filesystem interactie
+- widget discovery
+- manifest reading
+- installer-detectie
+- system info providers
+- process launching
+- netwerktoegang
+- browser engine integratie
+- config persistence
+
+#### Bootstrap
+Verantwoordelijk voor:
+
+- dependency wiring
+- application startup
+- binding van contracts naar implementaties
+- startflow van runtime of management context
+
+---
+
+## 3. Belangrijkste domeinconcepten
+
+### 3.1 Screen
+Een screen is een dashboardprofiel binnen de app.
+
+Een screen bevat:
+
+- identificatie
+- naam
+- availability state
+- layout
+- widget instances
+- screen state
+
+### 3.2 Widget Definition
+Een widget definition beschrijft een widgettype.
+
+Bijvoorbeeld:
+
+- naam
+- id
+- versie
+- capability declaratie
+- manifestinformatie
+- type widget
+
+### 3.3 Widget Instance
+Een widget instance is een concrete plaatsing van een widget op een screen.
+
+Een widget instance bevat:
+
+- verwijzing naar widget definition
+- screen-id
+- placement
+- grootte
+- widget settings
+- runtime state
+
+### 3.4 Layout
+De layout representeert het dashboard-grid van 3 kolommen × 2 rijen.
+
+### 3.5 Placement
+Placement representeert de toegewezen cellen binnen het grid.
+
+### 3.6 Capability Set
+Capability set representeert welke bevoegdheden een widget nodig heeft.
+
+### 3.7 Screen Availability
+Availability bepaalt of een screen beschikbaar, locked of later te activeren is.
+
+---
+
+## 4. Layoutmodel
+
+### 4.1 Grid
+Het layoutmodel is gebaseerd op:
+
+- 3 kolommen
+- 2 rijen
+- 6 cellen
+
+### 4.2 Toegestane groottes
+Toegestane widgetgroottes:
+
+- 1/6
+- 2/6
+- 4/6
+- 6/6
+
+### 4.3 Plaatsingsregels
+Plaatsing moet:
+
+- aaneengesloten zijn
+- rechthoekig zijn
+- binnen de grenzen van het grid vallen
+- geen overlap veroorzaken
+- de totale capaciteit respecteren
+
+### 4.4 Validatie
+Wanneer een widget niet geplaatst kan worden omdat de beschikbare capaciteit of vormregels worden overtreden, moet de operatie worden geweigerd.
+
+Deze validatie hoort thuis in domain policies, niet in de viewlaag.
+
+---
+
+## 5. Runtime- en beheermodel
+
+### 5.1 Runtime Context
+De runtime context is verantwoordelijk voor:
+
+- schermdetectie
+- fullscreen window placement
+- actieve screenrendering
+- user interaction met widgets
+- screen switching
+
+### 5.2 Management Context
+De management context is verantwoordelijk voor:
+
+- widget toevoegen
+- widget verwijderen
+- layout aanpassen
+- widget settings configureren
+- web widget URL/mobiele instellingen beheren
+
+### 5.3 Architecturale scheiding
+Runtime en management mogen UI-technisch gekoppeld zijn, maar hun verantwoordelijkheden moeten logisch gescheiden blijven.
+
+---
+
+## 6. Widgetarchitectuur
+
+### 6.1 Ingebouwde widgets
+Ingebouwde widgets bevinden zich onder:
+
+- /widgets
+
+Deze widgets maken deel uit van de hoofdapplicatie.
+
+### 6.2 Installeerbare widgets
+Installeerbare widgets bevinden zich onder:
+
+- /installable_widgets
+
+Deze widgets worden buiten de core geleverd, maar door de hoofdapp geladen.
+
+### 6.3 Widget Manager
+De widget manager is een gecoördineerde component met de volgende verantwoordelijkheden:
+
+- widget discovery
+- widget registration
+- manifest loading
+- instance creation
+- lifecycle management
+- capability validation
+- communication with main app
+
+De widget manager mag geen god object worden.  
+Interne opsplitsing in services of subcomponents is toegestaan en wenselijk zodra dat de verantwoordelijkheid scherp houdt.
+
+### 6.4 Widget Manifest
+Elke installeerbare widget moet een manifest hebben waarin minimaal declaratief wordt vastgelegd:
+
+- unieke identificatie
+- naam
+- versie
+- compatibiliteitsinformatie
+- capabilities
+- entrypoint of laadpunt
+- installatiemetadata
+
+### 6.5 Widget Capabilities
+Het framework moet voorbereid zijn op widgets die gebruikmaken van:
+
+- systeeminfo
+- filesystem
+- netwerk
+- process launching
+- settings mutatie
+
+Capabilities moeten expliciet gedeclareerd worden.
+
+---
+
+## 7. Browser Widget Architectuur
+
+### 7.1 Type
+De web widget is een ingebedde browser-widget binnen de hoofdapp.
+
+### 7.2 Technische richting
+De browserfunctionaliteit hoort thuis in infrastructure/presentation integration en niet in domain.
+
+### 7.3 Instellingen
+Elke web widget instance ondersteunt:
+
+- URL
+- mobile toggle
+- viewport mode
+- eigen instance settings
+
+### 7.4 Mobile mode
+Force mobile view betekent:
+
+- mobile user agent
+- mobile viewport behavior
+
+---
+
+## 8. Screen Management
+
+### 8.1 Screen Registry
+Een screen registry houdt bekende screens en hun availability bij.
+
+### 8.2 Screen State Service
+Deze service beheert actieve screen state en loading/saving van screens.
+
+### 8.3 Screen Switching
+Screen switching moet via een duidelijke application flow verlopen en niet als directe view-mutatie zonder coördinatie.
+
+### 8.4 Locked Screens
+Locked screens, zoals Developing, moeten zichtbaar kunnen zijn in de selector, maar niet functioneel beschikbaar zijn.
+
+Een placeholderstatus met Soon™ is voldoende voor v1.
+
+---
+
+## 9. Persistence Architectuur
+
+### 9.1 Opslagvorm
+De applicatie gebruikt lokale configopslag.
+
+### 9.2 Persistent op te slaan onderdelen
+Ten minste op te slaan:
+
+- screens
+- layouts
+- widget placements
+- widget instances
+- widget settings
+- availability status waar relevant
+- screen state
+
+### 9.3 Repositoryverantwoordelijkheid
+Persistence valt onder repositories en mag niet rechtstreeks in presentation worden afgehandeld.
+
+---
+
+## 10. Installatiemodel voor Widgets
+
+### 10.1 Installerrol
+Een widget-installer is een executable die:
+
+- controleert of de hoofdapp aanwezig is
+- widgetbestanden installeert naar een bekende custom directory onder de appfolder
+- de widget beschikbaar maakt voor discovery door de hoofdapp
+
+### 10.2 Grenzen
+De installer is geen vervanging voor runtime registratielogica binnen de hoofdapp.
+
+### 10.3 Compatibiliteit
+Het framework moet compatibiliteitsvalidatie mogelijk maken, ook als de eerste versie daarvan eenvoudig blijft.
+
+---
+
+## 11. Voorbereiding op toekomstige gated features
+
+### 11.1 Developing Screen
+De screen Developing is een gated feature.
+
+### 11.2 V1
+In v1 is deze screen niet activeerbaar en zichtbaar als Soon™.
+
+### 11.3 Latere uitbreiding
+Het framework moet voorbereid zijn op:
+
+- API-key validatie
+- feature activation
+- screen unlock policies
+
+De feitelijke keygeneratie en unlockflow vallen buiten v1.
+
+---
+
+## 12. Voorgestelde technische componenttypen
+
+### 12.1 Domain
+Mogelijke componenten:
+
+- Screen
+- ScreenLayout
+- WidgetDefinition
+- WidgetInstance
+- WidgetPlacement
+- CapabilitySet
+- ScreenAvailability
+- policies voor layout en availability
+
+### 12.2 Application
+Mogelijke componenten:
+
+- ScreenSwitchService
+- WidgetPlacementService
+- WidgetConfigurationService
+- RuntimeStartupService
+- ManagementFlowService
+
+### 12.3 Infrastructure
+Mogelijke componenten:
+
+- FileScreenRepository
+- FileWidgetRepository
+- WidgetManifestLoader
+- InstalledWidgetDiscoveryService
+- SystemInfoProvider
+- ProcessLauncher
+- LocalConfigStore
+
+### 12.4 Presentation
+Mogelijke componenten:
+
+- RuntimeWindow
+- ScreenSelectorView
+- DashboardGridView
+- ManagementView
+- WidgetHostView
+- WebWidgetView
+
+---
+
+## 13. Aanbevolen projectstructuur
+
+```text
+src/
+  app/
+    bootstrap/
+    domain/
+      models/
+      value_objects/
+      policies/
+      contracts/
+      exceptions/
+    application/
+      services/
+      use_cases/
+      controllers/
+      dto/
+    infrastructure/
+      persistence/
+      widgets/
+      system/
+      browser/
+      filesystem/
+    presentation/
+      views/
+      widgets/
+      dialogs/
+      controllers/
+    shared/
+      config/
+      logging/
+```
+
+Deze indeling is richtinggevend.  
+Belangrijker dan de mapnamen zijn de verantwoordelijkheid en dependency rules.
+
+---
+
+## 14. Dependency Rules
+
+### Toegestane richting
+- Presentation → Application
+- Application → Domain
+- Infrastructure → Domain contracts / Application contracts
+- Bootstrap → alles voor wiring
+
+### Verboden richting
+- Domain → Presentation
+- Domain → Infrastructure
+- Domain → PySide6
+- Presentation → directe persistence
+- Widget rendering → directe repository-aanroepen
+- Policies → UI afhankelijkheden
+
+---
+
+## 15. Belangrijke ontwerpregels voor v1
+
+- houd layoutvalidatie in domain
+- houd PySide6 buiten domain
+- houd repositories vrij van UI-logica
+- gebruik expliciete contracts waar grensvlakken belangrijk zijn
+- maak widget capabilities declaratief
+- behandel screens als dashboardprofielen, niet als fysieke monitors
+- behandel fysieke monitordetectie apart van screen management
+- houd runtime en management logisch gescheiden
+- bereid shop/extensibility voor zonder deze voortijdig volledig te bouwen
+
+---
+
+## 16. Niet-doen lijst
+
+Voor v1 expliciet vermijden:
+
+- business logic in views
+- directe repository calls vanuit widgets
+- één enorme widget manager met alle logica
+- impliciete filesystem scanning zonder duidelijke contracten
+- losstaande utility-klassen voor gemengde verantwoordelijkheden
+- ongecontroleerde fullscreen fallback op verkeerde monitor
+- early over-engineering voor shop/licensing
+- pluginmagic zonder manifest- of capabilitymodel
+
+---
+
+## 17. Resultaat van deze architectuur
+
+Wanneer deze architectuur correct wordt gevolgd, ontstaat een codebase die:
+
+- logisch uitbreidbaar is
+- geschikt is voor meerdere screens
+- voorbereid is op installable widgets
+- voorbereid is op gated functionaliteit
+- beheersbaar blijft tijdens groei
+- goed te reviewen is op structuur en verantwoordelijkheden

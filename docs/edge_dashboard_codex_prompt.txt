@@ -1,0 +1,239 @@
+# Edge Dashboard App — Codex Implementation Prompt
+
+Gebruik dit document als startprompt voor het project.
+
+De opdracht is om de technische basis van de applicatie op te zetten volgens de projectarchitectuur en functionele requirements.
+
+Werk niet prototype-achtig.  
+Werk alsof dit de eerste productiegerichte fundering van het project is.
+
+---
+
+## 1. Projectdoel
+
+Bouw de basis van een PySide6 desktop-applicatie voor de Corsair Xeneon Edge.
+
+De app is een dedicated second-screen dashboard platform dat fullscreen draait op de Edge, werkt met widgets, meerdere screen-profielen ondersteunt en voorbereid is op installeerbare widgets.
+
+---
+
+## 2. Belangrijkste functionele uitgangspunten
+
+De applicatie moet architectonisch voorbereid worden op deze functionele realiteit:
+
+- detectie van de Xeneon Edge op basis van resolutie
+- borderless fullscreen runtime op dat scherm
+- dashboard-grid van 3 kolommen × 2 rijen
+- totaal 6 cellen
+- widgets met groottes 1/6, 2/6, 4/6 en 6/6
+- weigeren van widgetplaatsing als de totale capaciteit wordt overschreden
+- meerdere screens/profielen:
+  - Gaming
+  - Performance
+  - Streaming
+  - Developing
+- Developing is in v1 locked en zichtbaar als Soon™
+- web widget ondersteunt URL + force mobile mode
+- force mobile mode betekent:
+  - mobile user agent
+  - mobile viewport behavior
+- ingebouwde widgets:
+  - klok
+  - launcher
+  - notities
+  - system stats
+  - web widget
+  - media controls
+- voorbereiding op installeerbare widgets
+- voorbereiding op widget shop
+- voorbereiding op feature gating voor Developing
+- lokale persistence voor screens, layouts, widget instances en settings
+- onderscheid tussen runtime mode en management/configuration mode
+
+---
+
+## 3. Wat nu gebouwd moet worden
+
+Richt je op de fundering en structuur.
+
+Bouw in elk geval:
+
+### 3.1 Application bootstrap
+- duidelijke startup entrypoint
+- composition root
+- dependency wiring zonder service locator
+- scheiding tussen bootstrap en businesslogica
+
+### 3.2 Layered architecture
+Implementeer een duidelijke scheiding tussen:
+
+- presentation
+- application
+- domain
+- infrastructure
+- bootstrap
+
+### 3.3 Domain foundation
+Maak domeinmodellen en policies voor:
+
+- screens
+- screen availability
+- widget definitions
+- widget instances
+- widget placements
+- dashboard layout
+- capability declaration
+- layoutvalidatie
+
+### 3.4 Runtime foundation
+Maak de basis voor:
+
+- monitor detection service
+- edge target resolution detection
+- runtime window placement
+- borderless fullscreen startup flow
+- screen selector concept
+- dashboard host concept
+
+### 3.5 Management foundation
+Maak de architectonische basis voor:
+
+- widget toevoegen
+- widget verwijderen
+- configuratie van widget instances
+- web widget configuratie
+- scheiding tussen runtime en beheer
+
+Nog niet alles hoeft volledig visueel afgewerkt te zijn, maar de structuur moet kloppen.
+
+### 3.6 Widget framework foundation
+Maak de basis voor:
+
+- ingebouwde widgets
+- installable widget concept
+- widget manifest model
+- widget discovery contract
+- widget registration flow
+- widget instance creation
+- capability declaration
+- lifecycle hook concept
+
+### 3.7 Persistence foundation
+Maak een lokale persistence-opzet voor:
+
+- screens
+- layouts
+- widget placements
+- widget instances
+- widget settings
+
+Houd de opslag simpel en expliciet.  
+Geen onnodig ingewikkelde persistence-opzet.
+
+---
+
+## 4. Niet bouwen als slimme shortcut
+
+Doe dit niet:
+
+- geen businesslogica in PySide6 views
+- geen repositories rechtstreeks vanuit widgets/views aanroepen
+- geen god manager voor alle widgetlogica
+- geen globale verborgen state
+- geen service locator
+- geen generieke magic plugin loader zonder manifestmodel
+- geen speculative shop implementation
+- geen speculative API-key infrastructuur buiten voorbereidende abstrahering
+- geen overmatige utility classes
+- geen framework leakage naar domain
+
+---
+
+## 5. Belangrijkste architectuurregels
+
+Volg strikt de regels uit Agent.md.
+
+Concreet:
+
+- respecteer SOLID
+- respecteer POLA
+- respecteer DRY zonder premature abstraction
+- respecteer KISS
+- houd verantwoordelijkheden klein en scherp
+- gebruik contracts/interfaces waar grensvlakken dat rechtvaardigen
+- houd PySide6 buiten domain
+- houd files klein en coherent
+- houd naming expliciet
+- bouw geen prototypecode die later herschreven moet worden
+
+---
+
+## 6. Technische voorkeuren
+
+- gebruik PySide6
+- gebruik expliciete constructor injection
+- gebruik duidelijke contracts of abstractions waar nodig
+- gebruik geen zware DI-container
+- gebruik een eenvoudige composition root
+- houd browser-functionaliteit voorbereid als ingebedde browser widget
+- houd capabilitymodel declaratief
+- behandel Developing als gated screen placeholder
+- behandel shop als placeholder met Soon™
+
+---
+
+## 7. Eerste concrete deliverable
+
+Lever een eerste projectfundering op met:
+
+- mapstructuur
+- basisklassen / contracts / modellen
+- policies voor layout en capacity validatie
+- screen- en widget-gerelateerde domeinmodellen
+- bootstrap en dependency wiring
+- basis runtime window
+- basis managementstructuur
+- persistencefundering
+- placeholderimplementaties voor ingebouwde widgets
+- duidelijke TODO-grenzen voor future work, zonder de codebase te vervuilen
+
+---
+
+## 8. Kwaliteitslat
+
+De code moet:
+
+- leesbaar zijn
+- expliciet zijn
+- klein van verantwoordelijkheid zijn
+- voorbereid zijn op uitbreiding
+- niet overengineered zijn
+- niet opgeblazen zijn
+- goed reviewbaar zijn
+- geschikt zijn voor kritische architecturale code review
+
+Maak liever een kleinere, sterke basis dan een grote maar slordige basis.
+
+---
+
+## 9. Reviewverwachting
+
+Schrijf code alsof deze direct wordt beoordeeld op:
+
+- verantwoordelijkheid per class
+- grensbewaking tussen lagen
+- kwaliteit van abstrahering
+- bloat
+- naming
+- testbaarheid
+- toekomstige onderhoudbaarheid
+
+Elke shortcut die de architectuur vervuilt, geldt als fout.
+
+---
+
+## 10. Samenvatting van intentie
+
+Dit project is geen scriptproject en geen throwaway prototype.
+
+Het moet vanaf het begin voelen als een beheersbare desktop-applicatie met een serieuze architecturale basis, geschreven voor groei, reviewbaarheid en uitbreidbaarheid.

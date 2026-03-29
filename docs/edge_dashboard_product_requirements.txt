@@ -1,0 +1,349 @@
+# Edge Dashboard App — Product & Functional Requirements
+
+## 1. Doel
+
+Deze applicatie is een dedicated second-screen dashboard platform voor de Corsair Xeneon Edge.  
+De applicatie draait fullscreen op de Edge en biedt een widget-based interface voor meerdere screen-profielen.
+
+De applicatie is bedoeld om tijdens andere activiteiten, zoals gamen, streamen of monitoren, een aanraakvriendelijke dashboardervaring te bieden op de Xeneon Edge.
+
+---
+
+## 2. Product Scope
+
+De applicatie moet:
+
+- de Xeneon Edge detecteren op basis van resolutie
+- automatisch starten op de gedetecteerde Edge
+- borderless fullscreen openen op dat scherm
+- een widget-based dashboard tonen
+- meerdere screen-profielen ondersteunen
+- lokale configuratie en layouts persistent bewaren
+- ingebouwde widgets ondersteunen
+- voorbereid zijn op installeerbare widgets van derden
+- voorbereid zijn op een toekomstige widget shop
+- een management/configuration mode bevatten naast de runtime mode
+
+---
+
+## 3. Detectie en Runtimegedrag
+
+### 3.1 Schermdetectie
+De applicatie detecteert de Xeneon Edge op basis van de doelresolutie.
+
+### 3.2 Startgedrag
+Wanneer de Xeneon Edge succesvol is gedetecteerd, moet de applicatie:
+
+- automatisch op dat scherm openen
+- borderless fullscreen starten
+- zich gedragen als dedicated runtime op dat scherm
+
+### 3.3 Fallbackgedrag
+Wanneer de Xeneon Edge niet kan worden gedetecteerd, mag de applicatie niet ongecontroleerd fullscreen openen op een willekeurig ander scherm.
+
+Een veilige fallback of duidelijke melding is vereist.
+
+---
+
+## 4. Dashboard Grid
+
+## 4.1 Gridstructuur
+Elke screen gebruikt een dashboard-grid van:
+
+- 3 kolommen
+- 2 rijen
+- totaal 6 cellen
+
+### 4.2 Widgetgrootte
+Widgets gebruiken ruimte op basis van 6 beschikbare grid-units.
+
+Toegestane groottes:
+
+- 1/6
+- 2/6
+- 4/6
+- 6/6
+
+### 4.3 Plaatsingsregels
+Widgets mogen alleen rechthoekige, aaneengesloten ruimte innemen.
+
+### 4.4 Capaciteitsvalidatie
+Wanneer een widget niet kan worden toegevoegd omdat de totale bezetting groter zou worden dan 6/6, moet de actie worden geweigerd.
+
+De gebruiker moet een duidelijke melding krijgen dat eerst een bestaande widget verwijderd moet worden.
+
+---
+
+## 5. Screens / Dashboardprofielen
+
+## 5.1 Concept
+Een screen is een zelfstandig dashboardprofiel binnen de applicatie.
+
+Een screen bestaat uit:
+
+- naam
+- beschikbaarheidsstatus
+- layout
+- widget instances
+- widgetinstellingen
+- persistente state
+
+### 5.2 Beschikbare screens
+De applicatie ondersteunt de volgende screens:
+
+- Gaming
+- Performance
+- Streaming
+- Developing
+
+### 5.3 Beschikbaarheid
+De volgende screens zijn standaard beschikbaar:
+
+- Gaming
+- Performance
+- Streaming
+
+De screen **Developing** is in v1 nog niet beschikbaar en moet in de interface worden getoond als:
+
+- Soon™
+
+### 5.4 Toekomstige activatie van Developing
+De screen **Developing** wordt later activeerbaar via een API key.
+
+Belangrijke regels:
+
+- alleen de eigenaar van het platform kan deze API keys genereren
+- activatie is toekomstig werk
+- het framework moet voorbereid zijn op feature gating
+- de functionele implementatie van keybeheer valt buiten v1
+
+### 5.5 Gedrag per screen
+Elke screen heeft:
+
+- een eigen layout
+- eigen widget instances
+- eigen widgetinstellingen
+- eigen persistente state
+
+Widgets mogen op meerdere screens tegelijk bestaan, maar altijd als afzonderlijke instances per screen.
+
+Per screen moet de laatste staat worden onthouden.
+
+---
+
+## 6. Runtime Mode en Management Mode
+
+## 6.1 Runtime Mode
+De runtime mode is de fullscreen dashboardweergave op de Xeneon Edge.
+
+Deze mode is gericht op:
+
+- consumptie
+- interactie met bestaande widgets
+- screen switching
+- touchvriendelijk gebruik
+
+### 6.2 Management / Configuration Mode
+De applicatie moet conceptueel een aparte beheerlaag ondersteunen voor configuratie.
+
+Deze beheerlaag moet ten minste deze acties ondersteunen:
+
+- widgets toevoegen
+- widgets verwijderen
+- widgetgrootte kiezen
+- URL invoeren voor web widgets
+- mobile toggle instellen
+- screenindelingen beheren
+
+Het beheer mag niet rommelig in de runtime worden gepropt.
+
+De scheiding tussen runtime en beheer moet onderdeel van de architectuur zijn, ook als de eerste implementatie eenvoudig blijft.
+
+---
+
+## 7. Standaardwidgets
+
+De applicatie bevat minimaal deze ingebouwde widgets:
+
+- klok
+- launcher
+- notities
+- system stats
+- web widget
+- media controls
+
+### 7.1 Beschikbaarheid
+Ingebouwde widgets zijn onderdeel van de hoofdapplicatie.
+
+### 7.2 Beheer
+Ingebouwde widgets mogen niet fysiek worden verwijderd uit de applicatie.
+
+Ze mogen wel:
+
+- verborgen worden
+- toegevoegd worden aan een screen
+- verwijderd worden uit een screenindeling
+- opnieuw toegevoegd worden aan een screen
+
+---
+
+## 8. Web Widget
+
+## 8.1 Concept
+De web widget is een browser-based widget binnen de hoofdapplicatie.
+
+Het betreft geen extern Chrome-venster, maar ingebedde browserfunctionaliteit binnen het widgetframework.
+
+### 8.2 Configuratie
+Bij het toevoegen van een web widget moet de gebruiker kunnen instellen:
+
+- URL
+- grootte
+- weergavemodus
+- force mobile view
+
+### 8.3 Mobile force
+Force mobile view betekent:
+
+- mobile user agent
+- mobile viewport behavior
+
+### 8.4 Multiple instances
+De web widget mag meerdere keren tegelijk bestaan binnen de applicatie, inclusief op meerdere screens.
+
+Elke instance heeft eigen instellingen.
+
+---
+
+## 9. Widgetsysteem
+
+## 9.1 Ingebouwde widgets
+Ingebouwde widgets bevinden zich in:
+
+- /widgets
+
+### 9.2 Installeerbare widgets
+Installeerbare widgets bevinden zich in:
+
+- /installable_widgets
+
+### 9.3 Toekomstige extensibility
+Het widgetframework moet voorbereid zijn op:
+
+- widget discovery
+- widget registration
+- manifest loading
+- instance creation
+- lifecycle management
+- capability validation
+- communication with main app
+
+### 9.4 Handmatige installatie in v1
+Voor v1 worden widgets handmatig geïnstalleerd.
+
+### 9.5 Toekomstige widget shop
+De applicatie moet conceptueel voorbereid zijn op een toekomstige widget shop.
+
+In v1 is deze functionaliteit niet beschikbaar en moet deze in de interface worden aangeduid als:
+
+- Soon™
+
+### 9.6 Externe developers
+Het systeem moet later ruimte bieden voor widgets van externe partijen.
+
+Deze widgets worden gebaseerd op een door de eigenaar aangeleverde developer handoff en streng beoordeeld voordat ze worden toegelaten.
+
+---
+
+## 10. Widget Installer
+
+## 10.1 Concept
+Een installeerbare widget wordt geleverd via een executable installer.
+
+### 10.2 Verwacht gedrag
+De installer moet:
+
+- detecteren of de hoofdapp aanwezig is
+- de widgetbestanden naar een custom directory onder de appfolder installeren
+- de widget op een controleerbare manier beschikbaar maken voor de hoofdapp
+
+### 10.3 Rolafbakening
+De installer is een distributie- en installatiecomponent.
+
+De installer is niet verantwoordelijk voor runtimebeheer, rendering of widgetlifecycle binnen de hoofdapp.
+
+---
+
+## 11. Widget Capabilities
+
+Het framework moet voorbereid zijn op widgets die één of meer van de volgende capabilities nodig hebben:
+
+- systeeminfo opvragen
+- files lezen/schrijven
+- netwerk gebruiken
+- eigen processen starten
+- instellingen wijzigen
+
+Deze capabilities moeten onderdeel zijn van een expliciet widget-capabilitymodel.
+
+Voorbereiding op validatie is vereist, ook als v1 nog geen volledig permission model bevat.
+
+---
+
+## 12. Persistence
+
+De applicatie gebruikt lokale configopslag.
+
+Persistent op te slaan gegevens omvatten ten minste:
+
+- screens
+- layouts
+- widget placements
+- widget instances
+- widget settings
+- screen-specifieke state
+
+De applicatie moet na herstart de laatst bekende configuratie correct kunnen herstellen.
+
+---
+
+## 13. Screen Switching
+
+De gebruiker moet tussen screens kunnen wisselen.
+
+Voor v1 geldt:
+
+- een duidelijke screen selector is voldoende
+- swipe of geavanceerde gesturebediening is niet vereist
+
+Locked screens, zoals Developing, mogen zichtbaar zijn maar nog niet functioneel beschikbaar zijn.
+
+---
+
+## 14. Out of Scope voor v1
+
+De volgende onderdelen vallen buiten de scope van v1, maar het framework moet erop voorbereid zijn:
+
+- widget shop
+- Developing activatie via API key
+- keygeneratie en licentiebeheer
+- geavanceerd permission management
+- geautomatiseerde third-party widget onboarding
+- publieke developer portal
+- import/export van screenprofielen
+
+---
+
+## 15. Acceptatiecriteria op hoofdlijnen
+
+De v1-basis is geslaagd wanneer:
+
+- de app de Xeneon Edge correct detecteert
+- de app borderless fullscreen opent op de Edge
+- screens persistent worden opgeslagen
+- widgets binnen een 3x2-grid kunnen worden beheerd
+- bezetting boven 6/6 correct wordt geweigerd
+- standaardwidgets beschikbaar zijn
+- web widgets URL + mobile toggle ondersteunen
+- runtime en management conceptueel gescheiden zijn
+- het widgetframework voorbereid is op toekomstige installables

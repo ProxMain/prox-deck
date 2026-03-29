@@ -1,0 +1,97 @@
+from __future__ import annotations
+
+import uuid
+
+from proxdeck.application.dto.management_state import ManagementState
+from proxdeck.application.services.screen_service import ScreenService
+from proxdeck.domain.contracts.widget_catalog import WidgetCatalog
+from proxdeck.domain.models.screen import Screen
+from proxdeck.domain.models.widget_definition import WidgetDefinition
+from proxdeck.domain.models.widget_instance import WidgetInstance
+from proxdeck.domain.value_objects.widget_placement import WidgetPlacement
+
+
+class WidgetManagementService:
+    def __init__(
+        self,
+        screen_service: ScreenService,
+        widget_catalog: WidgetCatalog,
+    ) -> None:
+        self._screen_service = screen_service
+        self._widget_catalog = widget_catalog
+
+    def load_management_state(self) -> ManagementState:
+        return ManagementState(
+            screens=tuple(self._screen_service.list_screens()),
+            widget_definitions=tuple(self._widget_catalog.list_widget_definitions()),
+        )
+
+    def add_widget_instance(
+        self,
+        screen_id: str,
+        widget_id: str,
+        column: int,
+        row: int,
+        width: int,
+        height: int,
+    ) -> Screen:
+        widget_instance = WidgetInstance(
+            instance_id=self._generate_instance_id(widget_id),
+            widget_id=widget_id,
+            screen_id=screen_id,
+            placement=WidgetPlacement(
+                column=column,
+                row=row,
+                width=width,
+                height=height,
+            ),
+            settings=self._build_default_settings(widget_id),
+        )
+        return self._screen_service.add_widget_instance(screen_id, widget_instance)
+
+    def remove_widget_instance(self, screen_id: str, instance_id: str) -> Screen:
+        return self._screen_service.remove_widget_instance(screen_id, instance_id)
+
+    def configure_web_widget(
+        self,
+        screen_id: str,
+        instance_id: str,
+        url: str,
+        force_mobile: bool,
+    ) -> Screen:
+        screen = next(
+            (item for item in self._screen_service.list_screens() if item.screen_id == screen_id),
+            None,
+        )
+        if screen is None:
+            raise ValueError(f"Unknown screen id: {screen_id}")
+
+        widget_instance = next(
+            (item for item in screen.layout.widget_instances if item.instance_id == instance_id),
+            None,
+        )
+        if widget_instance is None:
+            raise ValueError(f"Unknown widget instance id: {instance_id}")
+        if widget_instance.widget_id != "web":
+            raise ValueError("Only web widgets support URL and mobile configuration")
+
+        return self._screen_service.update_widget_instance_settings(
+            screen_id=screen_id,
+            instance_id=instance_id,
+            settings={
+                **widget_instance.settings,
+                "url": url.strip(),
+                "force_mobile": force_mobile,
+            },
+        )
+
+    def _generate_instance_id(self, widget_id: str) -> str:
+        return f"{widget_id}-{uuid.uuid4().hex[:8]}"
+
+    def _build_default_settings(self, widget_id: str) -> dict[str, object]:
+        if widget_id == "web":
+            return {
+                "url": "https://example.com",
+                "force_mobile": False,
+            }
+        return {}
