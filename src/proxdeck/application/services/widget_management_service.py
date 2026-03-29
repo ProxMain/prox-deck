@@ -8,6 +8,7 @@ from proxdeck.domain.contracts.widget_catalog import WidgetCatalog
 from proxdeck.domain.models.screen import Screen
 from proxdeck.domain.models.widget_definition import WidgetDefinition
 from proxdeck.domain.models.widget_instance import WidgetInstance
+from proxdeck.domain.policies.widget_placement_finder import WidgetPlacementFinder
 from proxdeck.domain.value_objects.widget_placement import WidgetPlacement
 
 
@@ -16,9 +17,11 @@ class WidgetManagementService:
         self,
         screen_service: ScreenService,
         widget_catalog: WidgetCatalog,
+        widget_placement_finder: WidgetPlacementFinder,
     ) -> None:
         self._screen_service = screen_service
         self._widget_catalog = widget_catalog
+        self._widget_placement_finder = widget_placement_finder
 
     def load_management_state(self) -> ManagementState:
         return ManagementState(
@@ -51,6 +54,28 @@ class WidgetManagementService:
 
     def remove_widget_instance(self, screen_id: str, instance_id: str) -> Screen:
         return self._screen_service.remove_widget_instance(screen_id, instance_id)
+
+    def suggest_placement(
+        self,
+        screen_id: str,
+        widget_id: str,
+        width: int,
+        height: int,
+    ) -> WidgetPlacement | None:
+        screen = next(
+            (item for item in self._screen_service.list_screens() if item.screen_id == screen_id),
+            None,
+        )
+        if screen is None:
+            raise ValueError(f"Unknown screen id: {screen_id}")
+
+        return self._widget_placement_finder.find_first_available(
+            layout=screen.layout,
+            screen_id=screen_id,
+            widget_id=widget_id,
+            width=width,
+            height=height,
+        )
 
     def configure_web_widget(
         self,

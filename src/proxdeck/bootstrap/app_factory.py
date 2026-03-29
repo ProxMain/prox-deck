@@ -12,6 +12,7 @@ from proxdeck.bootstrap.settings import APP_VERSION, AppPaths, build_app_paths
 from proxdeck.domain.models.widget_kind import WidgetKind
 from proxdeck.domain.policies.layout_policy import LayoutPolicy
 from proxdeck.domain.policies.screen_availability_policy import ScreenAvailabilityPolicy
+from proxdeck.domain.policies.widget_placement_finder import WidgetPlacementFinder
 from proxdeck.domain.policies.widget_compatibility_policy import (
     WidgetCompatibilityPolicy,
 )
@@ -77,6 +78,7 @@ class AppFactory:
             widget_management_service=WidgetManagementService(
                 screen_service=screen_service,
                 widget_catalog=widget_catalog,
+                widget_placement_finder=WidgetPlacementFinder(LayoutPolicy()),
             )
         )
         return ProxDeckApplication(

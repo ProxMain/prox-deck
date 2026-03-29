@@ -196,6 +196,10 @@ class RuntimeWindow(QMainWindow):
         add_button.clicked.connect(self._handle_add_widget)
         layout.addWidget(add_button)
 
+        suggest_button = QPushButton("Suggest Placement")
+        suggest_button.clicked.connect(self._handle_suggest_placement)
+        layout.addWidget(suggest_button)
+
         self._widget_instance_list = QListWidget()
         self._widget_instance_list.currentItemChanged.connect(self._load_web_widget_settings)
         layout.addWidget(self._widget_instance_list)
@@ -336,6 +340,39 @@ class RuntimeWindow(QMainWindow):
 
         self._refresh_management_instances()
         self._refresh_runtime_after_management()
+
+    def _handle_suggest_placement(self) -> None:
+        if (
+            self._management_screen_selector is None
+            or self._management_widget_selector is None
+            or self._column_input is None
+            or self._row_input is None
+            or self._width_input is None
+            or self._height_input is None
+        ):
+            return
+
+        try:
+            placement = self._management_controller.suggest_placement(
+                screen_id=self._management_screen_selector.currentData(),
+                widget_id=self._management_widget_selector.currentData(),
+                width=self._width_input.value(),
+                height=self._height_input.value(),
+            )
+        except ValueError as error:
+            QMessageBox.warning(self, "Placement suggestion failed", str(error))
+            return
+
+        if placement is None:
+            QMessageBox.warning(
+                self,
+                "No placement available",
+                "No valid placement is available for the selected widget size.",
+            )
+            return
+
+        self._column_input.setValue(placement.column)
+        self._row_input.setValue(placement.row)
 
     def _handle_remove_widget(self) -> None:
         if self._management_screen_selector is None or self._widget_instance_list is None:

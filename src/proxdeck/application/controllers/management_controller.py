@@ -3,6 +3,7 @@ from __future__ import annotations
 from proxdeck.application.dto.management_state import ManagementState
 from proxdeck.application.services.widget_management_service import WidgetManagementService
 from proxdeck.domain.models.screen import Screen
+from proxdeck.domain.value_objects.widget_placement import WidgetPlacement
 
 
 class ManagementController:
@@ -32,6 +33,20 @@ class ManagementController:
 
     def remove_widget_instance(self, screen_id: str, instance_id: str) -> Screen:
         return self._widget_management_service.remove_widget_instance(screen_id, instance_id)
+
+    def suggest_placement(
+        self,
+        screen_id: str,
+        widget_id: str,
+        width: int,
+        height: int,
+    ) -> WidgetPlacement | None:
+        return self._widget_management_service.suggest_placement(
+            screen_id=screen_id,
+            widget_id=widget_id,
+            width=width,
+            height=height,
+        )
 
     def configure_web_widget(
         self,
