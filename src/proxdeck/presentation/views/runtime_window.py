@@ -77,49 +77,65 @@ class RuntimeWindow(QMainWindow):
     def _build_ui(self) -> None:
         root = QWidget()
         root_layout = QVBoxLayout(root)
-        root_layout.setContentsMargins(24, 24, 24, 24)
-        root_layout.setSpacing(16)
+        if self._is_dedicated_runtime():
+            root_layout.setContentsMargins(0, 0, 0, 0)
+            root_layout.setSpacing(0)
+            root_layout.addWidget(self._build_dashboard_view())
+        else:
+            root_layout.setContentsMargins(24, 24, 24, 24)
+            root_layout.setSpacing(16)
 
-        header_layout = QHBoxLayout()
-        header_layout.addWidget(QLabel("Prox Deck Runtime"))
-        self._screen_selector = QComboBox()
-        for screen in self._runtime_state.available_screens:
-            label = screen.name
-            if not screen.is_available():
-                label = f"{label} (Soon)"
-            self._screen_selector.addItem(label, screen.screen_id)
-        self._screen_selector.currentIndexChanged.connect(self._handle_screen_change)
-        header_layout.addWidget(self._screen_selector)
+            header_layout = QHBoxLayout()
+            header_layout.addWidget(QLabel("Prox Deck Runtime"))
+            self._screen_selector = QComboBox()
+            for screen in self._runtime_state.available_screens:
+                label = screen.name
+                if not screen.is_available():
+                    label = f"{label} (Soon)"
+                self._screen_selector.addItem(label, screen.screen_id)
+            self._screen_selector.currentIndexChanged.connect(self._handle_screen_change)
+            header_layout.addWidget(self._screen_selector)
 
-        manage_button = QPushButton("Management")
-        manage_button.clicked.connect(self._show_management_mode)
-        header_layout.addWidget(manage_button)
-        runtime_button = QPushButton("Runtime")
-        runtime_button.clicked.connect(self._show_runtime_mode)
-        header_layout.addWidget(runtime_button)
-        root_layout.addLayout(header_layout)
+            manage_button = QPushButton("Management")
+            manage_button.clicked.connect(self._show_management_mode)
+            header_layout.addWidget(manage_button)
+            runtime_button = QPushButton("Runtime")
+            runtime_button.clicked.connect(self._show_runtime_mode)
+            header_layout.addWidget(runtime_button)
+            root_layout.addLayout(header_layout)
 
-        banner = self._create_runtime_banner()
-        self._screen_banner = QLabel(f"{banner.headline}\n{banner.detail}")
-        root_layout.addWidget(self._screen_banner)
+            banner = self._create_runtime_banner()
+            self._screen_banner = QLabel(f"{banner.headline}\n{banner.detail}")
+            root_layout.addWidget(self._screen_banner)
 
-        self._content_stack = QStackedWidget()
-        self._content_stack.addWidget(self._build_dashboard_view())
-        self._content_stack.addWidget(self._build_management_view())
-        root_layout.addWidget(self._content_stack)
+            self._content_stack = QStackedWidget()
+            self._content_stack.addWidget(self._build_dashboard_view())
+            self._content_stack.addWidget(self._build_management_view())
+            root_layout.addWidget(self._content_stack)
 
         self.setCentralWidget(root)
         self._select_active_screen()
 
+    def _is_dedicated_runtime(self) -> bool:
+        return self._runtime_state.runtime_target is not None
+
     def _build_dashboard_view(self) -> QWidget:
         widget = QWidget()
         layout = QVBoxLayout(widget)
-        layout.setSpacing(12)
-        layout.addWidget(QLabel("Runtime Dashboard"))
+        if self._is_dedicated_runtime():
+            layout.setContentsMargins(0, 0, 0, 0)
+            layout.setSpacing(0)
+        else:
+            layout.setSpacing(12)
+            layout.addWidget(QLabel("Runtime Dashboard"))
 
         grid_frame = QFrame()
         grid_layout = QGridLayout(grid_frame)
-        grid_layout.setSpacing(12)
+        if self._is_dedicated_runtime():
+            grid_layout.setContentsMargins(0, 0, 0, 0)
+            grid_layout.setSpacing(0)
+        else:
+            grid_layout.setSpacing(12)
         self._dashboard_grid = grid_layout
         layout.addWidget(grid_frame)
         self._render_runtime_screen(self._runtime_state.active_screen)

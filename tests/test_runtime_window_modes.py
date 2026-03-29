@@ -1,0 +1,98 @@
+import os
+
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
+from PySide6.QtWidgets import QApplication
+
+from proxdeck.application.dto.management_state import ManagementState
+from proxdeck.application.dto.runtime_state import RuntimeState
+from proxdeck.domain.models.runtime_target import RuntimeTarget
+from proxdeck.domain.models.screen import Screen
+from proxdeck.domain.models.screen_availability import ScreenAvailability
+from proxdeck.domain.models.screen_layout import ScreenLayout
+from proxdeck.presentation.views.runtime_window import RuntimeWindow
+
+
+class StubManagementController:
+    def __init__(self, screens) -> None:
+        self._state = ManagementState(screens=tuple(screens), widget_definitions=tuple())
+
+    def load_management_state(self):
+        return self._state
+
+
+class StubRuntimeController:
+    def __init__(self, screen: Screen) -> None:
+        self._screen = screen
+
+    def switch_screen(self, screen_id: str):
+        if screen_id != self._screen.screen_id:
+            raise ValueError(f"Unknown screen: {screen_id}")
+        return self._screen
+
+
+def test_runtime_window_uses_dashboard_only_layout_for_detected_target() -> None:
+    app = QApplication.instance() or QApplication([])
+    screen = _build_screen()
+    window = RuntimeWindow(
+        management_controller=StubManagementController([screen]),
+        runtime_controller=StubRuntimeController(screen),
+        runtime_state=RuntimeState(
+            active_screen=screen,
+            available_screens=(screen,),
+            runtime_target=RuntimeTarget(
+                monitor_name="CORSAIR Xeneon Edge",
+                width=1600,
+                height=480,
+                x=1920,
+                y=0,
+            ),
+        ),
+    )
+
+    layout = window.centralWidget().layout()
+
+    assert window._content_stack is None
+    assert window._management_view is None
+    assert window._screen_selector is None
+    assert window._screen_banner is None
+    assert layout.contentsMargins().left() == 0
+    assert layout.contentsMargins().top() == 0
+
+    window.deleteLater()
+    app.processEvents()
+
+
+def test_runtime_window_keeps_management_shell_in_fallback_mode() -> None:
+    app = QApplication.instance() or QApplication([])
+    screen = _build_screen()
+    window = RuntimeWindow(
+        management_controller=StubManagementController([screen]),
+        runtime_controller=StubRuntimeController(screen),
+        runtime_state=RuntimeState(
+            active_screen=screen,
+            available_screens=(screen,),
+            runtime_target=None,
+        ),
+    )
+
+    layout = window.centralWidget().layout()
+
+    assert window._content_stack is not None
+    assert window._management_view is not None
+    assert window._screen_selector is not None
+    assert window._screen_banner is not None
+    assert layout.contentsMargins().left() == 24
+    assert layout.contentsMargins().top() == 24
+
+    window.deleteLater()
+    app.processEvents()
+
+
+def _build_screen() -> Screen:
+    return Screen(
+        screen_id="gaming",
+        name="Gaming",
+        availability=ScreenAvailability.AVAILABLE,
+        layout=ScreenLayout(),
+    )
