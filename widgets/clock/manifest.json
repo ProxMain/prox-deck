@@ -1,0 +1,9 @@
+{
+  "widget_id": "clock",
+  "display_name": "Clock",
+  "version": "1.0.0",
+  "kind": "builtin",
+  "capabilities": [],
+  "entrypoint": "widgets.clock",
+  "supports_multiple_instances": true
+}

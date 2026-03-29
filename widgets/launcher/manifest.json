@@ -1,0 +1,9 @@
+{
+  "widget_id": "launcher",
+  "display_name": "Launcher",
+  "version": "1.0.0",
+  "kind": "builtin",
+  "capabilities": ["process-launch"],
+  "entrypoint": "widgets.launcher",
+  "supports_multiple_instances": true
+}

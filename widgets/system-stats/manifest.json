@@ -1,0 +1,9 @@
+{
+  "widget_id": "system-stats",
+  "display_name": "System Stats",
+  "version": "1.0.0",
+  "kind": "builtin",
+  "capabilities": ["system-info"],
+  "entrypoint": "widgets.system_stats",
+  "supports_multiple_instances": true
+}

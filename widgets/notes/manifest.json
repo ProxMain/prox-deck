@@ -1,0 +1,9 @@
+{
+  "widget_id": "notes",
+  "display_name": "Notes",
+  "version": "1.0.0",
+  "kind": "builtin",
+  "capabilities": ["filesystem"],
+  "entrypoint": "widgets.notes",
+  "supports_multiple_instances": true
+}

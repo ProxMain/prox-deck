@@ -15,7 +15,15 @@ from proxdeck.infrastructure.persistence.json_screen_repository import JsonScree
 from proxdeck.infrastructure.system.resolution_runtime_target_detector import (
     ResolutionRuntimeTargetDetector,
 )
-from proxdeck.infrastructure.widgets.in_memory_widget_catalog import InMemoryWidgetCatalog
+from proxdeck.infrastructure.widgets.discovered_widget_catalog import (
+    DiscoveredWidgetCatalog,
+)
+from proxdeck.infrastructure.widgets.filesystem_widget_discovery import (
+    FilesystemWidgetDiscovery,
+)
+from proxdeck.infrastructure.widgets.json_widget_manifest_loader import (
+    JsonWidgetManifestLoader,
+)
 from proxdeck.presentation.app import ProxDeckApplication
 
 
@@ -29,7 +37,15 @@ class AppFactory:
 
     def create(self) -> ProxDeckApplication:
         screen_repository = JsonScreenRepository(self._paths.screen_state_path)
-        widget_catalog = InMemoryWidgetCatalog()
+        widget_catalog = DiscoveredWidgetCatalog(
+            widget_discovery=FilesystemWidgetDiscovery(
+                roots=(
+                    self._paths.builtin_widgets_root,
+                    self._paths.installable_widgets_root,
+                ),
+                loader=JsonWidgetManifestLoader(),
+            )
+        )
         screen_service = ScreenService(
             screen_repository=screen_repository,
             widget_catalog=widget_catalog,

@@ -1,0 +1,9 @@
+{
+  "widget_id": "web",
+  "display_name": "Web Widget",
+  "version": "1.0.0",
+  "kind": "builtin",
+  "capabilities": ["network"],
+  "entrypoint": "widgets.web",
+  "supports_multiple_instances": true
+}

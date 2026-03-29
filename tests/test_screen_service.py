@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from proxdeck.application.services.default_screen_factory import DefaultScreenFactory
 from proxdeck.application.services.screen_service import ScreenService
 from proxdeck.domain.contracts.screen_repository import ScreenRepository
@@ -6,7 +8,15 @@ from proxdeck.domain.models.widget_instance import WidgetInstance
 from proxdeck.domain.policies.layout_policy import LayoutPolicy
 from proxdeck.domain.policies.screen_availability_policy import ScreenAvailabilityPolicy
 from proxdeck.domain.value_objects.widget_placement import WidgetPlacement
-from proxdeck.infrastructure.widgets.in_memory_widget_catalog import InMemoryWidgetCatalog
+from proxdeck.infrastructure.widgets.discovered_widget_catalog import (
+    DiscoveredWidgetCatalog,
+)
+from proxdeck.infrastructure.widgets.filesystem_widget_discovery import (
+    FilesystemWidgetDiscovery,
+)
+from proxdeck.infrastructure.widgets.json_widget_manifest_loader import (
+    JsonWidgetManifestLoader,
+)
 
 
 class InMemoryScreenRepository(ScreenRepository):
@@ -20,10 +30,20 @@ class InMemoryScreenRepository(ScreenRepository):
         self.saved_screens = list(screens)
 
 
+def build_widget_catalog() -> DiscoveredWidgetCatalog:
+    project_root = Path(__file__).resolve().parent.parent
+    return DiscoveredWidgetCatalog(
+        widget_discovery=FilesystemWidgetDiscovery(
+            roots=(project_root / "widgets", project_root / "installable_widgets"),
+            loader=JsonWidgetManifestLoader(),
+        )
+    )
+
+
 def test_screen_service_bootstraps_default_screens() -> None:
     service = ScreenService(
         screen_repository=InMemoryScreenRepository(),
-        widget_catalog=InMemoryWidgetCatalog(),
+        widget_catalog=build_widget_catalog(),
         default_screen_factory=DefaultScreenFactory(),
         layout_policy=LayoutPolicy(),
         availability_policy=ScreenAvailabilityPolicy(),
@@ -43,7 +63,7 @@ def test_screen_service_persists_widget_addition() -> None:
     repository = InMemoryScreenRepository()
     service = ScreenService(
         screen_repository=repository,
-        widget_catalog=InMemoryWidgetCatalog(),
+        widget_catalog=build_widget_catalog(),
         default_screen_factory=DefaultScreenFactory(),
         layout_policy=LayoutPolicy(),
         availability_policy=ScreenAvailabilityPolicy(),

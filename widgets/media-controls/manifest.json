@@ -1,0 +1,9 @@
+{
+  "widget_id": "media-controls",
+  "display_name": "Media Controls",
+  "version": "1.0.0",
+  "kind": "builtin",
+  "capabilities": ["system-info"],
+  "entrypoint": "widgets.media_controls",
+  "supports_multiple_instances": true
+}
