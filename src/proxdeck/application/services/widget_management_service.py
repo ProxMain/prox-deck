@@ -147,6 +147,15 @@ class WidgetManagementService:
         return f"{widget_id}-{uuid.uuid4().hex[:8]}"
 
     def _build_default_settings(self, widget_id: str) -> dict[str, object]:
+        if widget_id == "launcher":
+            return {
+                "items": [
+                    {"label": "GitHub", "target": "https://github.com"},
+                    {"label": "OpenAI", "target": "https://openai.com"},
+                    {"label": "YouTube", "target": "https://youtube.com"},
+                    {"label": "Settings", "target": "ms-settings:"},
+                ]
+            }
         if widget_id == "web":
             return {
                 "url": "https://example.com",

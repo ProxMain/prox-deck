@@ -124,3 +124,20 @@ def test_management_state_lists_builtin_widgets() -> None:
 
     widget_ids = {item.widget_id for item in state.widget_definitions}
     assert {"clock", "launcher", "notes", "system-stats", "web", "media-controls"} <= widget_ids
+
+
+def test_management_service_builds_default_launcher_items() -> None:
+    service = build_management_service()
+
+    screen = service.add_widget_instance(
+        screen_id="gaming",
+        widget_id="launcher",
+        column=0,
+        row=0,
+        width=1,
+        height=1,
+    )
+
+    settings = screen.layout.widget_instances[0].settings
+    assert settings["items"][0]["label"] == "GitHub"
+    assert settings["items"][3]["target"] == "ms-settings:"
