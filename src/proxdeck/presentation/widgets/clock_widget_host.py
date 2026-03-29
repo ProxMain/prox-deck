@@ -104,6 +104,12 @@ def build_clock_widget_host(
     dial.setMinimumHeight(220)
     layout.addWidget(dial, 1)
 
+    time_label = QLabel()
+    time_label.setStyleSheet(
+        "font-size: 22px; font-weight: 900; letter-spacing: 1px; color: rgba(229, 248, 255, 0.98);"
+    )
+    layout.addWidget(time_label, 0, Qt.AlignmentFlag.AlignHCenter)
+
     day_label = QLabel()
     day_label.setStyleSheet(
         "font-size: 15px; font-weight: 900; color: rgba(228, 247, 255, 0.98);"
@@ -119,6 +125,7 @@ def build_clock_widget_host(
     def refresh_clock() -> None:
         state = build_clock_display_state(datetime.now())
         dial.set_display_state(state)
+        time_label.setText(state.time_text)
         day_label.setText(state.day_name)
         date_label.setText(state.date_text)
 
@@ -180,7 +187,6 @@ class _ClockHudScene(QWidget):
         self._draw_crosshair(painter, center, radius - 48)
         self._draw_hands(painter, center, radius - 48)
         self._draw_center_core(painter, center)
-        self._draw_time_projection(painter, rect)
 
     def _draw_segment_arcs(self, painter: QPainter, center, radius: float) -> None:
         painter.setPen(QPen(QColor(128, 226, 255, 112), 3))
@@ -260,17 +266,6 @@ class _ClockHudScene(QWidget):
         painter.drawEllipse(center, 9, 9)
         painter.setBrush(QColor("#07121A"))
         painter.drawEllipse(center, 4, 4)
-
-    def _draw_time_projection(self, painter: QPainter, rect) -> None:
-        projection_rect = rect.adjusted(22, rect.height() - 62, -22, -10)
-
-        value_font = painter.font()
-        value_font.setPointSize(14)
-        if QFont is not object:
-            value_font.setWeight(QFont.Weight.ExtraBold)
-        painter.setFont(value_font)
-        painter.setPen(QColor(229, 248, 255))
-        painter.drawText(projection_rect, Qt.AlignmentFlag.AlignCenter, self._state.time_text)
 
     def _draw_hand(
         self,

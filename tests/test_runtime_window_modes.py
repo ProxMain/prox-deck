@@ -22,13 +22,14 @@ class StubManagementController:
 
 
 class StubRuntimeController:
-    def __init__(self, screen: Screen) -> None:
-        self._screen = screen
+    def __init__(self, screens) -> None:
+        self._screens = {screen.screen_id: screen for screen in screens}
 
     def switch_screen(self, screen_id: str):
-        if screen_id != self._screen.screen_id:
+        screen = self._screens.get(screen_id)
+        if screen is None:
             raise ValueError(f"Unknown screen: {screen_id}")
-        return self._screen
+        return screen
 
 
 def test_runtime_window_uses_dashboard_only_layout_for_detected_target() -> None:
@@ -36,7 +37,7 @@ def test_runtime_window_uses_dashboard_only_layout_for_detected_target() -> None
     screen = _build_screen()
     window = RuntimeWindow(
         management_controller=StubManagementController([screen]),
-        runtime_controller=StubRuntimeController(screen),
+        runtime_controller=StubRuntimeController([screen]),
         runtime_state=RuntimeState(
             active_screen=screen,
             available_screens=(screen,),
@@ -65,7 +66,7 @@ def test_runtime_window_keeps_management_shell_in_fallback_mode() -> None:
     screen = _build_screen()
     window = RuntimeWindow(
         management_controller=StubManagementController([screen]),
-        runtime_controller=StubRuntimeController(screen),
+        runtime_controller=StubRuntimeController([screen]),
         runtime_state=RuntimeState(
             active_screen=screen,
             available_screens=(screen,),
@@ -88,7 +89,7 @@ def test_runtime_window_locks_dashboard_grid_to_even_three_by_two_cell_distribut
     screen = _build_screen()
     window = RuntimeWindow(
         management_controller=StubManagementController([screen]),
-        runtime_controller=StubRuntimeController(screen),
+        runtime_controller=StubRuntimeController([screen]),
         runtime_state=RuntimeState(
             active_screen=screen,
             available_screens=(screen,),
@@ -106,10 +107,54 @@ def test_runtime_window_locks_dashboard_grid_to_even_three_by_two_cell_distribut
     app.processEvents()
 
 
-def _build_screen() -> Screen:
+def test_runtime_window_switches_to_next_screen_relative_to_active_screen() -> None:
+    app = QApplication.instance() or QApplication([])
+    gaming = _build_screen(screen_id="gaming", name="Gaming")
+    performance = _build_screen(screen_id="performance", name="Performance")
+    window = RuntimeWindow(
+        management_controller=StubManagementController([gaming, performance]),
+        runtime_controller=StubRuntimeController([gaming, performance]),
+        runtime_state=RuntimeState(
+            active_screen=gaming,
+            available_screens=(gaming, performance),
+            runtime_target=None,
+        ),
+    )
+
+    window._switch_relative_screen(1)
+
+    assert window._runtime_state.active_screen.screen_id == "performance"
+
+    window.deleteLater()
+    app.processEvents()
+
+
+def test_runtime_window_wraps_to_previous_screen_when_swiping_back() -> None:
+    app = QApplication.instance() or QApplication([])
+    gaming = _build_screen(screen_id="gaming", name="Gaming")
+    performance = _build_screen(screen_id="performance", name="Performance")
+    window = RuntimeWindow(
+        management_controller=StubManagementController([gaming, performance]),
+        runtime_controller=StubRuntimeController([gaming, performance]),
+        runtime_state=RuntimeState(
+            active_screen=gaming,
+            available_screens=(gaming, performance),
+            runtime_target=None,
+        ),
+    )
+
+    window._switch_relative_screen(-1)
+
+    assert window._runtime_state.active_screen.screen_id == "performance"
+
+    window.deleteLater()
+    app.processEvents()
+
+
+def _build_screen(screen_id: str = "gaming", name: str = "Gaming") -> Screen:
     return Screen(
-        screen_id="gaming",
-        name="Gaming",
+        screen_id=screen_id,
+        name=name,
         availability=ScreenAvailability.AVAILABLE,
         layout=ScreenLayout(),
     )

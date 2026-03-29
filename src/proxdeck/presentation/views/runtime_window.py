@@ -7,7 +7,7 @@ from proxdeck.domain.models.screen import Screen
 from proxdeck.presentation.widgets.widget_host_factory import WidgetHostFactory
 
 try:
-    from PySide6.QtCore import Qt
+    from PySide6.QtCore import QEvent, QPointF, Qt
     from PySide6.QtGui import QColor, QConicalGradient, QFont, QLinearGradient, QPainter, QPen, QRadialGradient
     from PySide6.QtWidgets import (
         QComboBox,
@@ -21,6 +21,8 @@ try:
         QWidget,
     )
 except ModuleNotFoundError:  # pragma: no cover - optional during headless tests
+    QEvent = object
+    QPointF = object
     Qt = None
     QColor = object
     QConicalGradient = object
@@ -58,6 +60,8 @@ class RuntimeWindow(QMainWindow):
         self._widget_host_factory = WidgetHostFactory()
         self._screen_selector: QComboBox | None = None
         self._dashboard_grid: QGridLayout | None = None
+        self._touch_swipe_anchor_x: float | None = None
+        self._touch_swipe_tracking = False
 
         self._configure_window()
         self._build_ui()
@@ -67,6 +71,17 @@ class RuntimeWindow(QMainWindow):
         self.setWindowTitle("Prox Deck")
         self.setMinimumSize(1200, 700)
         self.setWindowFlag(Qt.WindowType.FramelessWindowHint, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_AcceptTouchEvents, True)
+
+    def event(self, event) -> bool:  # type: ignore[override]
+        if QEvent is not object and event.type() in {
+            QEvent.Type.TouchBegin,
+            QEvent.Type.TouchUpdate,
+            QEvent.Type.TouchEnd,
+            QEvent.Type.TouchCancel,
+        }:
+            return self._handle_touch_event(event)
+        return super().event(event)
 
     def _build_ui(self) -> None:
         root = QWidget()
@@ -166,17 +181,7 @@ class RuntimeWindow(QMainWindow):
             return
 
         screen_id = self._screen_selector.itemData(index)
-        try:
-            screen = self._runtime_controller.switch_screen(screen_id)
-        except ValueError:
-            return
-
-        self._runtime_state = RuntimeState(
-            active_screen=screen,
-            available_screens=self._runtime_state.available_screens,
-            runtime_target=self._runtime_state.runtime_target,
-        )
-        self._render_runtime_screen(screen)
+        self._switch_to_screen_id(screen_id)
 
     def reload_runtime_state(self, runtime_state: RuntimeState) -> None:
         self._runtime_state = runtime_state
@@ -275,6 +280,71 @@ class RuntimeWindow(QMainWindow):
         if QSizePolicy is object:
             return
         widget.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Ignored)
+
+    def _switch_relative_screen(self, step: int) -> None:
+        if not self._runtime_state.available_screens:
+            return
+
+        current_index = next(
+            (
+                index
+                for index, screen in enumerate(self._runtime_state.available_screens)
+                if screen.screen_id == self._runtime_state.active_screen.screen_id
+            ),
+            0,
+        )
+        target_index = (current_index + step) % len(self._runtime_state.available_screens)
+        target_screen = self._runtime_state.available_screens[target_index]
+        self._switch_to_screen_id(target_screen.screen_id)
+
+    def _switch_to_screen_id(self, screen_id: str) -> None:
+        try:
+            screen = self._runtime_controller.switch_screen(screen_id)
+        except ValueError:
+            return
+
+        self._runtime_state = RuntimeState(
+            active_screen=screen,
+            available_screens=self._runtime_state.available_screens,
+            runtime_target=self._runtime_state.runtime_target,
+        )
+        self._render_runtime_screen(screen)
+        self._select_active_screen()
+
+    def _handle_touch_event(self, event) -> bool:
+        points = event.points()
+        if event.type() == QEvent.Type.TouchBegin:
+            self._touch_swipe_tracking = len(points) >= 2
+            self._touch_swipe_anchor_x = self._average_touch_x(points) if self._touch_swipe_tracking else None
+            event.accept()
+            return True
+
+        if event.type() == QEvent.Type.TouchUpdate:
+            if self._touch_swipe_tracking and len(points) >= 2 and self._touch_swipe_anchor_x is not None:
+                current_x = self._average_touch_x(points)
+                delta_x = current_x - self._touch_swipe_anchor_x
+                if abs(delta_x) >= 120:
+                    self._switch_relative_screen(-1 if delta_x > 0 else 1)
+                    self._touch_swipe_tracking = False
+                    self._touch_swipe_anchor_x = None
+            event.accept()
+            return True
+
+        self._touch_swipe_tracking = False
+        self._touch_swipe_anchor_x = None
+        event.accept()
+        return True
+
+    @staticmethod
+    def _average_touch_x(points) -> float:
+        total = 0.0
+        for point in points:
+            position = point.position()
+            if isinstance(position, QPointF):
+                total += position.x()
+            else:
+                total += position.x()
+        return total / len(points)
 
 
 class _GaugeBayPlaceholder(QWidget):
