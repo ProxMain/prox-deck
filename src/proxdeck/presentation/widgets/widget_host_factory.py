@@ -4,6 +4,7 @@ from typing import Callable
 
 from proxdeck.domain.models.widget_definition import WidgetDefinition
 from proxdeck.domain.models.widget_instance import WidgetInstance
+from proxdeck.presentation.widgets.clock_widget_host import build_clock_widget_host
 from proxdeck.presentation.widgets.system_stats_widget_host import (
     build_system_stats_widget_host,
 )
@@ -90,11 +91,9 @@ class WidgetHostFactory:
         widget_instance: WidgetInstance,
         widget_definition: WidgetDefinition | None,
     ) -> QWidget:
-        return self._build_card(
-            title="Clock",
-            subtitle=widget_instance.instance_id,
-            detail="Builtin runtime placeholder for the clock widget.",
-            accent="#48B2FF",
+        return build_clock_widget_host(
+            widget_instance=widget_instance,
+            widget_definition=widget_definition,
             footer=self._build_metadata_footer(widget_definition),
         )
 
