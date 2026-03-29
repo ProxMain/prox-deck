@@ -17,6 +17,9 @@ try:
         QCheckBox,
         QComboBox,
         QFormLayout,
+        QFrame,
+        QGridLayout,
+        QGroupBox,
         QHBoxLayout,
         QLabel,
         QLineEdit,
@@ -24,6 +27,7 @@ try:
         QListWidgetItem,
         QMessageBox,
         QPushButton,
+        QScrollArea,
         QSpinBox,
         QVBoxLayout,
         QWidget,
@@ -33,6 +37,9 @@ except ModuleNotFoundError:  # pragma: no cover - optional during headless tests
     QCheckBox = object
     QComboBox = object
     QFormLayout = object
+    QFrame = object
+    QGridLayout = object
+    QGroupBox = object
     QHBoxLayout = object
     QLabel = object
     QLineEdit = object
@@ -40,6 +47,7 @@ except ModuleNotFoundError:  # pragma: no cover - optional during headless tests
     QListWidgetItem = object
     QMessageBox = object
     QPushButton = object
+    QScrollArea = object
     QSpinBox = object
     QVBoxLayout = object
     QWidget = object
@@ -89,8 +97,34 @@ class ManagementView(QWidget):
 
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
-        layout.setSpacing(12)
-        layout.addWidget(QLabel("Management mode"))
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(16)
+
+        title_label = QLabel("Configuration")
+        title_label.setStyleSheet("font-size: 24px; font-weight: 700; color: #EAF0F6;")
+        layout.addWidget(title_label)
+
+        subtitle_label = QLabel(
+            "Manage screens, place widgets, and configure widget-specific behavior."
+        )
+        subtitle_label.setWordWrap(True)
+        subtitle_label.setStyleSheet("font-size: 13px; color: #8FA3B7;")
+        layout.addWidget(subtitle_label)
+
+        content_layout = QHBoxLayout()
+        content_layout.setSpacing(16)
+        layout.addLayout(content_layout, 1)
+
+        left_column = QVBoxLayout()
+        left_column.setSpacing(16)
+        right_column = QVBoxLayout()
+        right_column.setSpacing(16)
+        content_layout.addLayout(left_column, 3)
+        content_layout.addLayout(right_column, 2)
+
+        selection_card = self._build_section_card("Screen & Widget Selection")
+        selection_layout = QVBoxLayout(selection_card)
+        selection_layout.setSpacing(10)
 
         self._management_screen_selector = QComboBox()
         for screen in self._management_state.screens:
@@ -99,81 +133,122 @@ class ManagementView(QWidget):
         self._management_screen_selector.currentIndexChanged.connect(
             self._refresh_management_instances
         )
-        layout.addWidget(self._management_screen_selector)
+        selection_layout.addWidget(QLabel("Screen"))
+        selection_layout.addWidget(self._management_screen_selector)
 
         self._management_widget_selector = QComboBox()
         for definition in self._management_state.widget_definitions:
             self._management_widget_selector.addItem(
                 definition.display_name,
                 definition.widget_id,
-            )
+        )
         self._management_widget_selector.currentIndexChanged.connect(
             self._refresh_definition_metadata
         )
-        layout.addWidget(self._management_widget_selector)
+        selection_layout.addWidget(QLabel("Widget Type"))
+        selection_layout.addWidget(self._management_widget_selector)
 
         self._size_preset_selector = QComboBox()
         for preset in SIZE_PRESET_DIMENSIONS:
             self._size_preset_selector.addItem(preset, preset)
         self._size_preset_selector.currentIndexChanged.connect(self._apply_selected_size_preset)
-        layout.addWidget(self._size_preset_selector)
+        selection_layout.addWidget(QLabel("Size Preset"))
+        selection_layout.addWidget(self._size_preset_selector)
 
         self._definition_metadata_label = QLabel()
         self._definition_metadata_label.setWordWrap(True)
-        layout.addWidget(self._definition_metadata_label)
+        self._definition_metadata_label.setStyleSheet("color: #C8D3DE;")
+        selection_layout.addWidget(self._definition_metadata_label)
 
+        left_column.addWidget(selection_card)
+
+        status_card = self._build_section_card("Screen Status")
+        status_layout = QVBoxLayout(status_card)
+        status_layout.setSpacing(8)
         self._management_status_label = QLabel()
         self._management_status_label.setWordWrap(True)
-        layout.addWidget(self._management_status_label)
+        self._management_status_label.setStyleSheet("color: #D7E2EC;")
+        status_layout.addWidget(self._management_status_label)
+        left_column.addWidget(status_card)
 
-        placement_layout = QHBoxLayout()
+        placement_card = self._build_section_card("Placement & Add")
+        placement_layout = QGridLayout(placement_card)
+        placement_layout.setHorizontalSpacing(10)
+        placement_layout.setVerticalSpacing(10)
         self._column_input = self._build_spin_box(0, 2)
         self._row_input = self._build_spin_box(0, 1)
         self._width_input = self._build_spin_box(1, 3)
         self._height_input = self._build_spin_box(1, 2)
-        placement_layout.addWidget(QLabel("Col"))
-        placement_layout.addWidget(self._column_input)
-        placement_layout.addWidget(QLabel("Row"))
-        placement_layout.addWidget(self._row_input)
-        placement_layout.addWidget(QLabel("Width"))
-        placement_layout.addWidget(self._width_input)
-        placement_layout.addWidget(QLabel("Height"))
-        placement_layout.addWidget(self._height_input)
-        layout.addLayout(placement_layout)
+        placement_layout.addWidget(QLabel("Column"), 0, 0)
+        placement_layout.addWidget(self._column_input, 0, 1)
+        placement_layout.addWidget(QLabel("Row"), 0, 2)
+        placement_layout.addWidget(self._row_input, 0, 3)
+        placement_layout.addWidget(QLabel("Width"), 1, 0)
+        placement_layout.addWidget(self._width_input, 1, 1)
+        placement_layout.addWidget(QLabel("Height"), 1, 2)
+        placement_layout.addWidget(self._height_input, 1, 3)
 
         self._add_widget_button = QPushButton("Add Widget")
         self._add_widget_button.clicked.connect(self._handle_add_widget)
-        layout.addWidget(self._add_widget_button)
-
         self._suggest_placement_button = QPushButton("Suggest Placement")
         self._suggest_placement_button.clicked.connect(self._handle_suggest_placement)
-        layout.addWidget(self._suggest_placement_button)
+        placement_layout.addWidget(self._suggest_placement_button, 2, 0, 1, 2)
+        placement_layout.addWidget(self._add_widget_button, 2, 2, 1, 2)
+        left_column.addWidget(placement_card)
 
+        instances_card = self._build_section_card("Widget Instances")
+        instances_layout = QVBoxLayout(instances_card)
+        instances_layout.setSpacing(10)
         self._widget_instance_list = QListWidget()
         self._widget_instance_list.currentItemChanged.connect(self._load_web_widget_settings)
-        layout.addWidget(self._widget_instance_list)
+        self._widget_instance_list.setMinimumHeight(220)
+        instances_layout.addWidget(self._widget_instance_list)
 
         self._instance_metadata_label = QLabel()
         self._instance_metadata_label.setWordWrap(True)
-        layout.addWidget(self._instance_metadata_label)
+        self._instance_metadata_label.setStyleSheet("color: #C8D3DE;")
+        instances_layout.addWidget(self._instance_metadata_label)
 
         self._remove_widget_button = QPushButton("Remove Selected")
         self._remove_widget_button.clicked.connect(self._handle_remove_widget)
-        layout.addWidget(self._remove_widget_button)
+        instances_layout.addWidget(self._remove_widget_button)
+        left_column.addWidget(instances_card, 1)
 
+        config_scroll = QScrollArea()
+        config_scroll.setWidgetResizable(True)
+        config_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        config_container = QWidget()
+        config_layout = QVBoxLayout(config_container)
+        config_layout.setContentsMargins(0, 0, 0, 0)
+        config_layout.setSpacing(16)
+        config_scroll.setWidget(config_container)
+        right_column.addWidget(config_scroll, 1)
+
+        web_card = self._build_section_card("Web Widget")
+        web_layout = QVBoxLayout(web_card)
+        web_layout.setSpacing(10)
         self._web_url_input = QLineEdit()
         self._web_url_input.setPlaceholderText("https://example.com")
         self._web_mobile_checkbox = QCheckBox("Force mobile view")
-        layout.addWidget(QLabel("Web widget configuration"))
-        layout.addWidget(self._web_url_input)
-        layout.addWidget(self._web_mobile_checkbox)
+        web_layout.addWidget(QLabel("URL"))
+        web_layout.addWidget(self._web_url_input)
+        web_layout.addWidget(self._web_mobile_checkbox)
 
         self._save_web_button = QPushButton("Save Web Settings")
         self._save_web_button.clicked.connect(self._handle_save_web_settings)
-        layout.addWidget(self._save_web_button)
+        web_layout.addWidget(self._save_web_button)
+        config_layout.addWidget(web_card)
 
-        layout.addWidget(QLabel("Launcher configuration"))
+        launcher_card = self._build_section_card("Launcher")
+        launcher_layout = QVBoxLayout(launcher_card)
+        launcher_layout.setSpacing(10)
+        launcher_hint = QLabel("Configure up to four quick actions for the selected launcher.")
+        launcher_hint.setWordWrap(True)
+        launcher_hint.setStyleSheet("font-size: 12px; color: #8FA3B7;")
+        launcher_layout.addWidget(launcher_hint)
         launcher_form = QFormLayout()
+        launcher_form.setHorizontalSpacing(10)
+        launcher_form.setVerticalSpacing(8)
         for index in range(4):
             label_input = QLineEdit()
             label_input.setPlaceholderText(f"Action {index + 1} label")
@@ -181,16 +256,64 @@ class ManagementView(QWidget):
             target_input.setPlaceholderText(f"Action {index + 1} target")
             self._launcher_label_inputs.append(label_input)
             self._launcher_target_inputs.append(target_input)
-            launcher_form.addRow(label_input, target_input)
-        layout.addLayout(launcher_form)
+            row_widget = QWidget()
+            row_layout = QHBoxLayout(row_widget)
+            row_layout.setContentsMargins(0, 0, 0, 0)
+            row_layout.setSpacing(8)
+            row_layout.addWidget(label_input, 1)
+            row_layout.addWidget(target_input, 2)
+            launcher_form.addRow(f"Action {index + 1}", row_widget)
+        launcher_layout.addLayout(launcher_form)
 
         self._save_launcher_button = QPushButton("Save Launcher Settings")
         self._save_launcher_button.clicked.connect(self._handle_save_launcher_settings)
-        layout.addWidget(self._save_launcher_button)
+        launcher_layout.addWidget(self._save_launcher_button)
+        config_layout.addWidget(launcher_card)
+        config_layout.addStretch(1)
 
         self._refresh_management_instances()
         self._apply_selected_size_preset()
         self._refresh_definition_metadata()
+
+        self.setStyleSheet(
+            "QWidget { background: #111820; color: #EAF0F6; }"
+            "QLabel { color: #EAF0F6; }"
+            "QComboBox, QLineEdit, QSpinBox, QListWidget {"
+            "background: #1A2430;"
+            "border: 1px solid #314355;"
+            "border-radius: 10px;"
+            "padding: 8px;"
+            "color: #EAF0F6;"
+            "}"
+            "QPushButton {"
+            "background: #E3A23B;"
+            "border: none;"
+            "border-radius: 10px;"
+            "padding: 10px 14px;"
+            "color: #1E1609;"
+            "font-weight: 700;"
+            "}"
+            "QPushButton:hover { background: #F0B557; }"
+            "QGroupBox {"
+            "border: 1px solid #2A3A49;"
+            "border-radius: 16px;"
+            "margin-top: 10px;"
+            "padding: 14px;"
+            "background: #151F29;"
+            "}"
+            "QGroupBox::title {"
+            "subcontrol-origin: margin;"
+            "left: 12px;"
+            "padding: 0 6px;"
+            "color: #F3F6FA;"
+            "font-weight: 700;"
+            "}"
+        )
+
+    def _build_section_card(self, title: str) -> QGroupBox:
+        card = QGroupBox(title)
+        card.setFlat(False)
+        return card
 
     def _build_spin_box(self, minimum: int, maximum: int) -> QSpinBox:
         spin_box = QSpinBox()
