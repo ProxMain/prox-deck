@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from typing import Callable
+from collections.abc import Callable
 
 from proxdeck.domain.models.widget_definition import WidgetDefinition
 from proxdeck.domain.models.widget_instance import WidgetInstance
 from proxdeck.presentation.widgets.clock_widget_host import build_clock_widget_host
+from proxdeck.presentation.widgets.notes_widget_host import build_notes_widget_host
 from proxdeck.presentation.widgets.system_stats_widget_host import (
     build_system_stats_widget_host,
 )
@@ -37,9 +38,17 @@ class WidgetHostFactory:
         self,
         widget_instance: WidgetInstance,
         widget_definition: WidgetDefinition | None = None,
+        on_widget_settings_changed: Callable[[str, dict[str, object]], None] | None = None,
     ) -> QWidget:
         if Qt is None:
             raise RuntimeError("PySide6 is required to build runtime widgets")
+
+        if widget_instance.widget_id == "notes":
+            return self._build_notes_widget(
+                widget_instance,
+                widget_definition,
+                on_widget_settings_changed=on_widget_settings_changed,
+            )
 
         builder = self._builders.get(widget_instance.widget_id, self._build_unknown_widget)
         return builder(widget_instance, widget_definition)
@@ -127,14 +136,13 @@ class WidgetHostFactory:
         self,
         widget_instance: WidgetInstance,
         widget_definition: WidgetDefinition | None,
+        on_widget_settings_changed: Callable[[str, dict[str, object]], None] | None = None,
     ) -> QWidget:
-        note_preview = str(widget_instance.settings.get("note_preview", "No note content yet."))
-        return self._build_card(
-            title="Notes",
-            subtitle=widget_instance.instance_id,
-            detail=note_preview,
-            accent="#F2B750",
+        return build_notes_widget_host(
+            widget_instance=widget_instance,
+            widget_definition=widget_definition,
             footer=self._build_metadata_footer(widget_definition),
+            on_settings_changed=on_widget_settings_changed,
         )
 
     def _build_system_stats_widget(

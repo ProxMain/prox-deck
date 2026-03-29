@@ -19,3 +19,15 @@ class RuntimeController:
 
     def switch_screen(self, screen_id: str):
         return self._screen_service.switch_screen(screen_id)
+
+    def update_widget_settings(
+        self,
+        screen_id: str,
+        instance_id: str,
+        settings: dict[str, object],
+    ):
+        return self._screen_service.update_widget_instance_settings(
+            screen_id=screen_id,
+            instance_id=instance_id,
+            settings=settings,
+        )

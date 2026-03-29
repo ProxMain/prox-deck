@@ -158,7 +158,15 @@ class RuntimeWindow(QMainWindow):
         for instance in screen.layout.widget_instances:
             occupied_cells.update(instance.placement.cells())
             definition = self._find_widget_definition(instance.widget_id)
-            widget = self._widget_host_factory.create_widget(instance, definition)
+            widget = self._widget_host_factory.create_widget(
+                instance,
+                definition,
+                on_widget_settings_changed=lambda instance_id, settings, screen_id=screen.screen_id: self._handle_widget_settings_changed(
+                    screen_id,
+                    instance_id,
+                    settings,
+                ),
+            )
             self._dashboard_grid.addWidget(
                 widget,
                 instance.placement.row,
@@ -184,6 +192,15 @@ class RuntimeWindow(QMainWindow):
                     "}"
                 )
                 self._dashboard_grid.addWidget(cell, row, column)
+
+    def _handle_widget_settings_changed(
+        self,
+        screen_id: str,
+        instance_id: str,
+        settings: dict[str, object],
+    ) -> None:
+        self._runtime_controller.update_widget_settings(screen_id, instance_id, settings)
+        self.reload_runtime_state(self._runtime_controller.load_runtime_state())
 
     def _rebuild_screen_selector(self) -> None:
         if self._screen_selector is None:
