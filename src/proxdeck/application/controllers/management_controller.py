@@ -101,3 +101,21 @@ class ManagementController:
             instance_id=instance_id,
             items=items,
         )
+
+    def update_widget_instance_placement(
+        self,
+        screen_id: str,
+        instance_id: str,
+        column: int,
+        row: int,
+        width: int,
+        height: int,
+    ) -> Screen:
+        return self._widget_management_service.update_widget_instance_placement(
+            screen_id=screen_id,
+            instance_id=instance_id,
+            column=column,
+            row=row,
+            width=width,
+            height=height,
+        )

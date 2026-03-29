@@ -169,3 +169,63 @@ def test_management_service_updates_launcher_items() -> None:
         {"label": "Docs", "target": "https://example.com/docs"},
         {"label": "Mail", "target": "mailto:test@example.com"},
     ]
+
+
+def test_management_service_updates_widget_placement() -> None:
+    service = build_management_service()
+    screen = service.add_widget_instance(
+        screen_id="gaming",
+        widget_id="clock",
+        column=0,
+        row=0,
+        width=1,
+        height=1,
+    )
+    instance_id = screen.layout.widget_instances[0].instance_id
+
+    updated = service.update_widget_instance_placement(
+        screen_id="gaming",
+        instance_id=instance_id,
+        column=2,
+        row=1,
+        width=1,
+        height=1,
+    )
+
+    placement = updated.layout.widget_instances[0].placement
+    assert (placement.column, placement.row, placement.width, placement.height) == (2, 1, 1, 1)
+
+
+def test_management_service_rejects_overlapping_widget_placement_update() -> None:
+    service = build_management_service()
+    first = service.add_widget_instance(
+        screen_id="gaming",
+        widget_id="clock",
+        column=0,
+        row=0,
+        width=1,
+        height=1,
+    )
+    service.add_widget_instance(
+        screen_id="gaming",
+        widget_id="notes",
+        column=1,
+        row=0,
+        width=1,
+        height=1,
+    )
+    instance_id = first.layout.widget_instances[0].instance_id
+
+    try:
+        service.update_widget_instance_placement(
+            screen_id="gaming",
+            instance_id=instance_id,
+            column=1,
+            row=0,
+            width=1,
+            height=1,
+        )
+    except ValueError as error:
+        assert "overlaps" in str(error).lower()
+    else:  # pragma: no cover - defensive assertion
+        raise AssertionError("Expected overlapping placement update to be rejected")

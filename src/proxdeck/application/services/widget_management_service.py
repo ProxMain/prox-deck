@@ -185,6 +185,24 @@ class WidgetManagementService:
             },
         )
 
+    def update_widget_instance_placement(
+        self,
+        screen_id: str,
+        instance_id: str,
+        column: int,
+        row: int,
+        width: int,
+        height: int,
+    ) -> Screen:
+        return self._screen_service.update_widget_instance_placement(
+            screen_id=screen_id,
+            instance_id=instance_id,
+            column=column,
+            row=row,
+            width=width,
+            height=height,
+        )
+
     def _generate_instance_id(self, widget_id: str) -> str:
         return f"{widget_id}-{uuid.uuid4().hex[:8]}"
 

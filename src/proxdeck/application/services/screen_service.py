@@ -167,6 +167,71 @@ class ScreenService:
         self._screen_repository.save_screens(updated_screens)
         return updated_screen
 
+    def update_widget_instance_placement(
+        self,
+        screen_id: str,
+        instance_id: str,
+        column: int,
+        row: int,
+        width: int,
+        height: int,
+    ) -> Screen:
+        screens = self.list_screens()
+        updated_screens: list[Screen] = []
+        updated_screen: Screen | None = None
+
+        for screen in screens:
+            if screen.screen_id != screen_id:
+                updated_screens.append(screen)
+                continue
+
+            self._availability_policy.ensure_accessible(screen)
+            base_layout = screen.layout.without_widget_instance(instance_id)
+            updated_instances = []
+            instance_updated = False
+            for instance in screen.layout.widget_instances:
+                if instance.instance_id != instance_id:
+                    updated_instances.append(instance)
+                    continue
+
+                instance_updated = True
+                updated_instance = WidgetInstance(
+                    instance_id=instance.instance_id,
+                    widget_id=instance.widget_id,
+                    screen_id=instance.screen_id,
+                    placement=type(instance.placement)(
+                        column=column,
+                        row=row,
+                        width=width,
+                        height=height,
+                    ),
+                    settings=instance.settings,
+                    runtime_state=instance.runtime_state,
+                )
+                self._layout_policy.ensure_widget_can_be_added(base_layout, updated_instance)
+                updated_instances.append(updated_instance)
+
+            if not instance_updated:
+                raise ValueError(f"Unknown widget instance id: {instance_id}")
+
+            updated_screen = Screen(
+                screen_id=screen.screen_id,
+                name=screen.name,
+                availability=screen.availability,
+                layout=type(screen.layout)(
+                    grid_size=screen.layout.grid_size,
+                    widget_instances=tuple(updated_instances),
+                ),
+                state=screen.state,
+            )
+            updated_screens.append(updated_screen)
+
+        if updated_screen is None:
+            raise ValueError(f"Unknown screen id: {screen_id}")
+
+        self._screen_repository.save_screens(updated_screens)
+        return updated_screen
+
     def _find_screen(self, screen_id: str) -> Screen:
         for screen in self.list_screens():
             if screen.screen_id == screen_id:

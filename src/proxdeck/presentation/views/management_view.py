@@ -7,9 +7,11 @@ from proxdeck.application.controllers.management_controller import ManagementCon
 from proxdeck.application.dto.management_state import ManagementState
 from proxdeck.domain.models.screen import Screen
 from proxdeck.domain.value_objects.widget_size import SIZE_PRESET_DIMENSIONS, WidgetSize
+from proxdeck.presentation.views.layout_preview import LayoutPreviewWidget
 from proxdeck.presentation.views.widget_definition_summary import (
     format_widget_definition_summary,
 )
+from proxdeck.presentation.widgets.widget_host_factory import WidgetHostFactory
 
 try:
     from PySide6.QtCore import Qt
@@ -72,6 +74,7 @@ class ManagementView(QWidget):
         self._management_controller = management_controller
         self._on_state_changed = on_state_changed
         self._management_state = self._management_controller.load_management_state()
+        self._widget_host_factory = WidgetHostFactory()
         self._management_screen_selector: QComboBox | None = None
         self._management_widget_selector: QComboBox | None = None
         self._size_preset_selector: QComboBox | None = None
@@ -80,6 +83,7 @@ class ManagementView(QWidget):
         self._web_mobile_checkbox: QCheckBox | None = None
         self._launcher_label_inputs: list[QLineEdit] = []
         self._launcher_target_inputs: list[QLineEdit] = []
+        self._layout_preview: LayoutPreviewWidget | None = None
         self._column_input: QSpinBox | None = None
         self._row_input: QSpinBox | None = None
         self._width_input: QSpinBox | None = None
@@ -199,6 +203,16 @@ class ManagementView(QWidget):
         instances_card = self._build_section_card("Widget Instances")
         instances_layout = QVBoxLayout(instances_card)
         instances_layout.setSpacing(10)
+        self._layout_preview = LayoutPreviewWidget(
+            on_move_instance=self._handle_preview_move,
+            on_resize_instance=self._handle_preview_resize,
+            on_select_instance=self._handle_preview_select,
+            render_widget_preview=lambda instance, definition: self._widget_host_factory.create_widget(
+                instance,
+                definition,
+            ),
+        )
+        instances_layout.addWidget(self._layout_preview)
         self._widget_instance_list = QListWidget()
         self._widget_instance_list.currentItemChanged.connect(self._load_web_widget_settings)
         self._widget_instance_list.setMinimumHeight(220)
@@ -343,6 +357,7 @@ class ManagementView(QWidget):
             return
 
         self._apply_screen_state(screen)
+        self._refresh_layout_preview(screen)
         for instance in screen.layout.widget_instances:
             item = QListWidgetItem(
                 f"{instance.widget_id} @ ({instance.placement.column}, {instance.placement.row}) "
@@ -375,6 +390,7 @@ class ManagementView(QWidget):
 
         self.refresh()
         self._notify_state_changed()
+        self._refresh_layout_preview(self._current_screen())
 
     def _handle_suggest_placement(self) -> None:
         if (
@@ -426,6 +442,7 @@ class ManagementView(QWidget):
 
         self.refresh()
         self._notify_state_changed()
+        self._refresh_layout_preview(self._current_screen())
 
     def _load_web_widget_settings(self, *_args) -> None:
         if (
@@ -473,6 +490,7 @@ class ManagementView(QWidget):
             self._clear_launcher_settings()
 
         self._refresh_instance_metadata(instance)
+        self._refresh_layout_preview(screen)
 
     def _handle_save_web_settings(self) -> None:
         if (
@@ -500,6 +518,7 @@ class ManagementView(QWidget):
 
         self.refresh()
         self._notify_state_changed()
+        self._refresh_layout_preview(self._current_screen())
 
     def _handle_save_launcher_settings(self) -> None:
         if self._management_screen_selector is None or self._widget_instance_list is None:
@@ -530,6 +549,7 @@ class ManagementView(QWidget):
 
         self.refresh()
         self._notify_state_changed()
+        self._refresh_layout_preview(self._current_screen())
 
     def _apply_selected_size_preset(self, *_args) -> None:
         if (
@@ -599,6 +619,14 @@ class ManagementView(QWidget):
             None,
         )
 
+    def _selected_instance_id(self) -> str | None:
+        if self._widget_instance_list is None:
+            return None
+        current_item = self._widget_instance_list.currentItem()
+        if current_item is None:
+            return None
+        return current_item.data(Qt.ItemDataRole.UserRole)
+
     def _apply_screen_state(self, screen: Screen) -> None:
         ui_state = self.build_screen_ui_state(screen)
         for widget in (
@@ -650,6 +678,79 @@ class ManagementView(QWidget):
         ):
             label_input.clear()
             target_input.clear()
+
+    def _refresh_layout_preview(self, screen: Screen | None) -> None:
+        if self._layout_preview is None:
+            return
+        self._layout_preview.set_screen(
+            screen=screen,
+            definitions=self._management_state.widget_definitions,
+            selected_instance_id=self._selected_instance_id(),
+        )
+
+    def _handle_preview_select(self, instance_id: str) -> None:
+        if self._widget_instance_list is None:
+            return
+        for index in range(self._widget_instance_list.count()):
+            item = self._widget_instance_list.item(index)
+            if item.data(Qt.ItemDataRole.UserRole) == instance_id:
+                self._widget_instance_list.setCurrentItem(item)
+                return
+
+    def _handle_preview_move(self, instance_id: str, column: int, row: int) -> None:
+        screen = self._current_screen()
+        if screen is None:
+            return
+        instance = next(
+            (item for item in screen.layout.widget_instances if item.instance_id == instance_id),
+            None,
+        )
+        if instance is None:
+            return
+        try:
+            self._management_controller.update_widget_instance_placement(
+                screen_id=screen.screen_id,
+                instance_id=instance_id,
+                column=column,
+                row=row,
+                width=instance.placement.width,
+                height=instance.placement.height,
+            )
+        except ValueError as error:
+            QMessageBox.warning(self, "Move rejected", str(error))
+            self._refresh_layout_preview(screen)
+            return
+        self.refresh()
+        self._notify_state_changed()
+        self._handle_preview_select(instance_id)
+
+    def _handle_preview_resize(self, instance_id: str, size_preset: str) -> None:
+        screen = self._current_screen()
+        if screen is None:
+            return
+        instance = next(
+            (item for item in screen.layout.widget_instances if item.instance_id == instance_id),
+            None,
+        )
+        if instance is None:
+            return
+        _, width, height = WidgetSize.from_preset(size_preset)
+        try:
+            self._management_controller.update_widget_instance_placement(
+                screen_id=screen.screen_id,
+                instance_id=instance_id,
+                column=instance.placement.column,
+                row=instance.placement.row,
+                width=width,
+                height=height,
+            )
+        except ValueError as error:
+            QMessageBox.warning(self, "Resize rejected", str(error))
+            self._refresh_layout_preview(screen)
+            return
+        self.refresh()
+        self._notify_state_changed()
+        self._handle_preview_select(instance_id)
 
     @staticmethod
     def build_screen_ui_state(screen: Screen) -> ManagementScreenUiState:
