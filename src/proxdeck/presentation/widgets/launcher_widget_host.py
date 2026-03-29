@@ -54,7 +54,7 @@ def build_launcher_widget_host(
     card.setStyleSheet(
         "QFrame {"
         "background: #0F1B13;"
-        "border: 2px solid #66D18F;"
+        "border: none;"
         "border-radius: 14px;"
         "padding: 12px;"
         "}"
@@ -73,14 +73,6 @@ def build_launcher_widget_host(
     layout = QVBoxLayout(card)
     layout.setSpacing(8)
 
-    title_label = QLabel("Launcher")
-    title_label.setStyleSheet("font-size: 20px; font-weight: 700;")
-    layout.addWidget(title_label)
-
-    subtitle_label = QLabel(widget_instance.instance_id)
-    subtitle_label.setStyleSheet("font-size: 13px; color: #A8D7B7;")
-    layout.addWidget(subtitle_label)
-
     status_label = QLabel("Quick actions ready.")
     status_label.setWordWrap(True)
     status_label.setStyleSheet("font-size: 12px; color: #B8D8C3;")
@@ -96,10 +88,6 @@ def build_launcher_widget_host(
         grid.addWidget(button, index // 2, index % 2)
     layout.addLayout(grid)
 
-    footer_label = QLabel(footer)
-    footer_label.setWordWrap(True)
-    footer_label.setStyleSheet("font-size: 11px; color: #88A592;")
-    layout.addWidget(footer_label)
     layout.addStretch(1)
     return card
 

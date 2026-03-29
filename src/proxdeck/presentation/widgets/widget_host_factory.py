@@ -59,18 +59,15 @@ class WidgetHostFactory:
 
     def _build_card(
         self,
-        title: str,
-        subtitle: str,
         detail: str,
         accent: str,
-        footer: str,
     ) -> QWidget:
         card = QFrame()
         card.setFrameStyle(QFrame.Shape.Box | QFrame.Shadow.Plain)
         card.setStyleSheet(
             "QFrame {"
             "background: #101822;"
-            f"border: 2px solid {accent};"
+            "border: none;"
             "border-radius: 14px;"
             "padding: 12px;"
             "}"
@@ -79,23 +76,10 @@ class WidgetHostFactory:
         layout = QVBoxLayout(card)
         layout.setSpacing(8)
 
-        title_label = QLabel(title)
-        title_label.setStyleSheet("font-size: 20px; font-weight: 700;")
-        layout.addWidget(title_label)
-
-        subtitle_label = QLabel(subtitle)
-        subtitle_label.setStyleSheet("font-size: 13px; color: #9DB1C7;")
-        layout.addWidget(subtitle_label)
-
         detail_label = QLabel(detail)
         detail_label.setWordWrap(True)
         detail_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
         layout.addWidget(detail_label)
-
-        footer_label = QLabel(footer)
-        footer_label.setWordWrap(True)
-        footer_label.setStyleSheet("font-size: 11px; color: #89A0B8;")
-        layout.addWidget(footer_label)
         layout.addStretch(1)
         return card
 
@@ -127,11 +111,8 @@ class WidgetHostFactory:
         widget_definition: WidgetDefinition | None,
     ) -> QWidget:
         return self._build_card(
-            title="Community Browser",
-            subtitle=widget_instance.instance_id,
             detail="Sample installable widget placeholder discovered from installable_widgets/.",
             accent="#4ED0C3",
-            footer=self._build_metadata_footer(widget_definition),
         )
 
     def _build_notes_widget(
@@ -186,11 +167,8 @@ class WidgetHostFactory:
         widget_definition: WidgetDefinition | None,
     ) -> QWidget:
         return self._build_card(
-            title="Unknown Widget",
-            subtitle=widget_instance.widget_id,
             detail=f"No runtime presenter is registered for {widget_instance.widget_id}.",
             accent="#7B8794",
-            footer=self._build_metadata_footer(widget_definition),
         )
 
     def _build_metadata_footer(self, widget_definition: WidgetDefinition | None) -> str:

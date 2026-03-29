@@ -27,7 +27,7 @@ def build_notes_widget_host(
     card.setStyleSheet(
         "QFrame {"
         "background: #19140A;"
-        "border: 2px solid #F2B750;"
+        "border: none;"
         "border-radius: 14px;"
         "padding: 12px;"
         "}"
@@ -51,14 +51,6 @@ def build_notes_widget_host(
     layout = QVBoxLayout(card)
     layout.setSpacing(8)
 
-    title_label = QLabel("Notes")
-    title_label.setStyleSheet("font-size: 20px; font-weight: 700;")
-    layout.addWidget(title_label)
-
-    subtitle_label = QLabel(widget_instance.instance_id)
-    subtitle_label.setStyleSheet("font-size: 13px; color: #E8D3A1;")
-    layout.addWidget(subtitle_label)
-
     editor = QTextEdit()
     editor.setPlaceholderText("Type a note for this screen...")
     editor.setPlainText(str(widget_instance.settings.get("content", "")))
@@ -66,11 +58,6 @@ def build_notes_widget_host(
 
     save_button = QPushButton("Save Note")
     layout.addWidget(save_button)
-
-    footer_label = QLabel(footer)
-    footer_label.setWordWrap(True)
-    footer_label.setStyleSheet("font-size: 11px; color: #C8B27A;")
-    layout.addWidget(footer_label)
 
     def save_note() -> None:
         if on_settings_changed is None:

@@ -105,7 +105,7 @@ def _build_browser_unavailable_card(
     card.setStyleSheet(
         "QFrame {"
         "background: #101822;"
-        "border: 2px solid #B58CFF;"
+        "border: none;"
         "border-radius: 14px;"
         "padding: 12px;"
         "}"
@@ -113,12 +113,6 @@ def _build_browser_unavailable_card(
     )
     layout = QVBoxLayout(card)
     layout.setSpacing(8)
-    title_label = QLabel("Web Widget")
-    title_label.setStyleSheet("font-size: 20px; font-weight: 700;")
-    layout.addWidget(title_label)
-    subtitle_label = QLabel("Mobile view enabled" if mobile else "Desktop view enabled")
-    subtitle_label.setStyleSheet("font-size: 13px; color: #9DB1C7;")
-    layout.addWidget(subtitle_label)
     detail_label = QLabel(
         "Embedded browser support is unavailable in this environment.\n"
         f"Target URL: {url}"
@@ -126,9 +120,5 @@ def _build_browser_unavailable_card(
     detail_label.setWordWrap(True)
     detail_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
     layout.addWidget(detail_label)
-    footer_label = QLabel(footer)
-    footer_label.setWordWrap(True)
-    footer_label.setStyleSheet("font-size: 11px; color: #89A0B8;")
-    layout.addWidget(footer_label)
     layout.addStretch(1)
     return card

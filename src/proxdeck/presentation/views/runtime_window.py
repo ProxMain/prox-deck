@@ -80,7 +80,7 @@ class RuntimeWindow(QMainWindow):
             "QLabel { background: transparent; }"
             "QComboBox {"
             "background: rgba(8, 18, 28, 0.94);"
-            "border: 1px solid rgba(88, 180, 227, 0.34);"
+            "border: none;"
             "border-radius: 12px;"
             "padding: 8px 12px;"
             "font-weight: 700;"
@@ -127,7 +127,7 @@ class RuntimeWindow(QMainWindow):
         grid_frame.setStyleSheet(
             "QFrame {"
             "background: rgba(5, 11, 18, 0.74);"
-            "border: 1px solid rgba(76, 149, 188, 0.28);"
+            "border: none;"
             "border-radius: 28px;"
             "}"
         )
@@ -296,7 +296,7 @@ class _GaugeBayPlaceholder(QWidget):
         shell_gradient.setColorAt(0.0, QColor(7, 15, 24, 242))
         shell_gradient.setColorAt(1.0, QColor(4, 8, 14, 248))
         painter.setBrush(shell_gradient)
-        painter.setPen(QPen(QColor(74, 152, 192, 74), 1.4))
+        painter.setPen(Qt.PenStyle.NoPen)
         painter.drawRoundedRect(rect, 22, 22)
 
         dial_rect = rect.adjusted(26, 22, -26, -54)

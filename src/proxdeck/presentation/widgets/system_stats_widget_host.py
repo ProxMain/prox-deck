@@ -393,10 +393,9 @@ def build_system_stats_display_state(
     moment: datetime,
 ) -> SystemStatsDisplayState:
     variant = select_system_stats_layout_variant(placement)
-    overline = "CORE DIAL" if variant == "compact" else "PERFORMANCE STACK"
     return SystemStatsDisplayState(
         layout_variant=variant,
-        overline_text=overline,
+        overline_text="",
         primary_metric=_build_dial_metric(
             label="CPU",
             value=snapshot.cpu_percent,
@@ -442,7 +441,7 @@ def build_system_stats_widget_host(
         "QFrame {"
         "background: qradialgradient(cx:0.24, cy:0.18, radius:1.15, fx:0.24, fy:0.18, "
         "stop:0 #10243B, stop:0.34 #091320, stop:0.72 #060C14, stop:1 #04070D);"
-        "border: 1px solid rgba(92, 193, 240, 0.30);"
+        "border: none;"
         "border-radius: 28px;"
         "}"
     )
@@ -537,7 +536,7 @@ class _CircularTelemetryPanel(_SystemStatsPanel):
         shell_gradient.setColorAt(0.5, QColor(7, 15, 26, 248))
         shell_gradient.setColorAt(1.0, QColor(4, 8, 14, 252))
         painter.setBrush(shell_gradient)
-        painter.setPen(QPen(QColor(78, 169, 215, 66), 1.4))
+        painter.setPen(Qt.PenStyle.NoPen)
         painter.drawRoundedRect(rect, 28, 28)
 
     def _draw_overline(self, painter: QPainter, rect: QRectF) -> None:
