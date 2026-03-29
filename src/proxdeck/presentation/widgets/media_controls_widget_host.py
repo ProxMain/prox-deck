@@ -53,8 +53,9 @@ def build_media_controls_widget_host(
     widget_instance: WidgetInstance,
     widget_definition: WidgetDefinition | None,
     footer: str,
+    session_reader: WindowsMediaSessionReader,
+    live_updates: bool = True,
 ) -> QWidget:
-    reader = WindowsMediaSessionReader()
     card = QWidget()
     card.setToolTip(footer)
     card.setStyleSheet(
@@ -83,16 +84,16 @@ def build_media_controls_widget_host(
     layout.addWidget(status_label, 0, Qt.AlignmentFlag.AlignHCenter)
 
     def refresh_media_state() -> None:
-        snapshot = reader.read_current_session()
+        snapshot = session_reader.read_current_session()
         stage.set_session_snapshot(snapshot)
         status_label.setText(_status_text_for(snapshot))
 
     refresh_media_state()
-    if QTimer is not object:
-        timer = QTimer(card)
-        timer.setInterval(1500)
-        timer.timeout.connect(refresh_media_state)
-        timer.start()
+    if live_updates and QTimer is not object:
+        card._media_refresh_timer = QTimer(card)  # type: ignore[attr-defined]
+        card._media_refresh_timer.setInterval(33)  # type: ignore[attr-defined]
+        card._media_refresh_timer.timeout.connect(refresh_media_state)  # type: ignore[attr-defined]
+        card._media_refresh_timer.start()  # type: ignore[attr-defined]
 
     stage.bind_status_label(status_label)
     return card
@@ -125,7 +126,7 @@ class _MediaControlStrip(QWidget):
         self._build_buttons()
         if QTimer is not object:
             self._animation_timer = QTimer(self)
-            self._animation_timer.setInterval(90)
+            self._animation_timer.setInterval(33)
             self._animation_timer.timeout.connect(self._advance_animation)
             self._animation_timer.start()
 
@@ -204,15 +205,16 @@ class _MediaControlStrip(QWidget):
         gap = 4.0
         bar_width = max(3.0, (rect.width() - gap * (bar_count - 1)) / bar_count)
         baseline = rect.bottom()
-        active = self._session.is_playing is True
+        active = self._session.is_playing is True or (self._session.audio_level or 0.0) > 0.01
         track_seed = (sum(ord(char) for char in self._session.title) % 11) / 11.0 if self._session.title else 0.0
         progress = _timeline_progress(self._session)
+        energy = min(1.0, max(0.0, (self._session.audio_level or 0.0) * 1.9))
 
         for index in range(bar_count):
             x = rect.left() + index * (bar_width + gap)
             wave = math.sin(self._animation_phase + index * 0.55 + progress * math.pi * 4)
             ripple = math.sin((self._animation_phase * 0.6) + index * 1.1 + track_seed * math.pi * 2)
-            normalized = 0.18 + (wave + 1.0) * 0.24 + (ripple + 1.0) * 0.14
+            normalized = 0.12 + energy * 0.18 + (wave + 1.0) * (0.12 + energy * 0.14) + (ripple + 1.0) * (0.06 + energy * 0.08)
             if not active:
                 idle_wave = math.sin((self._animation_phase * 0.75) + index * 0.45)
                 idle_ripple = math.sin((self._animation_phase * 0.33) + index * 0.9)
@@ -334,6 +336,8 @@ class _TransportIconButton(QPushButton):
 def _status_text_for(snapshot: MediaSessionSnapshot) -> str:
     if not snapshot.is_available:
         return "Start playback in Spotify, YouTube, VLC, or another media app."
+    if snapshot.artist == "Active audio session":
+        return f"{snapshot.source_app}  |  Active audio session"
     return f"{snapshot.title}  |  {snapshot.artist}"
 
 

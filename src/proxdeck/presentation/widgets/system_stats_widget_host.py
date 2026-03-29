@@ -4,6 +4,7 @@ import ctypes
 import json
 import math
 import subprocess
+import threading
 import time
 from dataclasses import dataclass
 from datetime import datetime
@@ -82,7 +83,7 @@ class SystemStatsDisplayState:
 
 
 class WindowsSystemStatsProvider:
-    def __init__(self) -> None:
+    def __init__(self, start_background_polling: bool = True) -> None:
         self._previous_cpu_times: tuple[int, int, int] | None = None
         self._gpu_counter_query: ctypes.c_void_p | None = None
         self._gpu_counter_handles: list[ctypes.c_void_p] = []
@@ -92,11 +93,51 @@ class WindowsSystemStatsProvider:
         self._lhm_last_sample_at = 0.0
         self._lhm_cached_metrics: dict[str, float | None] = {}
         self._hwinfo_bridge = HWiNFOBridge()
+        self._last_hwinfo_complete_at = 0.0
+        self._cached_snapshot = SystemStatsSnapshot(
+            cpu_percent=None,
+            memory_percent=None,
+            gpu_percent=None,
+            cpu_temp_c=None,
+            case_temp_c=None,
+            gpu_temp_c=None,
+            cpu_clock_ghz=None,
+            memory_used_gb=None,
+            memory_total_gb=None,
+        )
+        self._lock = threading.Lock()
+        self._stop_event = threading.Event()
+        self._poll_thread: threading.Thread | None = None
+        if start_background_polling:
+            self._cached_snapshot = self._poll_once()
+            self._poll_thread = threading.Thread(target=self._poll_loop, name="system-stats-provider", daemon=True)
+            self._poll_thread.start()
 
     def read_snapshot(self) -> SystemStatsSnapshot:
+        if self._poll_thread is None:
+            return self._poll_once()
+        with self._lock:
+            return self._cached_snapshot
+
+    def close(self) -> None:
+        self._stop_event.set()
+        if self._poll_thread is not None:
+            self._poll_thread.join(timeout=0.2)
+
+    def _poll_loop(self) -> None:
+        while not self._stop_event.wait(1.5):
+            snapshot = self._poll_once()
+            with self._lock:
+                self._cached_snapshot = snapshot
+
+    def _poll_once(self) -> SystemStatsSnapshot:
         memory_metrics = self._read_memory_metrics()
-        lhm_metrics = self._read_lhm_metrics()
         hwinfo_metrics = self._hwinfo_bridge.read_metrics()
+        if self._has_complete_hwinfo_metrics(hwinfo_metrics):
+            self._last_hwinfo_complete_at = time.monotonic()
+            lhm_metrics = {}
+        else:
+            lhm_metrics = self._read_lhm_metrics()
         return SystemStatsSnapshot(
             cpu_percent=self._read_cpu_percent(),
             memory_percent=memory_metrics[0],
@@ -158,6 +199,8 @@ class WindowsSystemStatsProvider:
         return round(float(status.dwMemoryLoad), 1), used_gb, total_gb
 
     def _read_gpu_percent(self) -> float | None:
+        if time.monotonic() - self._last_hwinfo_complete_at < 30.0:
+            return self._gpu_fallback_cached_value
         if not hasattr(ctypes, "windll"):
             return self._read_gpu_percent_from_powershell()
 
@@ -317,7 +360,7 @@ class WindowsSystemStatsProvider:
 
     def _read_lhm_metrics(self) -> dict[str, float | None]:
         now = time.monotonic()
-        if now - self._lhm_last_sample_at < 3.0:
+        if now - self._lhm_last_sample_at < 15.0:
             return self._lhm_cached_metrics
 
         self._lhm_last_sample_at = now
@@ -380,6 +423,14 @@ class WindowsSystemStatsProvider:
         }
         return self._lhm_cached_metrics
 
+    def _has_complete_hwinfo_metrics(self, metrics) -> bool:
+        return (
+            metrics.gpu_percent is not None
+            and metrics.cpu_temp_c is not None
+            and metrics.case_temp_c is not None
+            and metrics.gpu_temp_c is not None
+        )
+
 
 def select_system_stats_layout_variant(placement: WidgetPlacement) -> str:
     if placement.width == 1 and placement.height == 1:
@@ -433,7 +484,9 @@ def build_system_stats_widget_host(
     widget_definition: WidgetDefinition | None,
     footer: str,
     provider: WindowsSystemStatsProvider | None = None,
+    live_updates: bool = True,
 ) -> QWidget:
+    owns_provider = provider is None
     provider = provider or WindowsSystemStatsProvider()
     card = QFrame()
     card.setToolTip(footer)
@@ -462,11 +515,14 @@ def build_system_stats_widget_host(
         dashboard.apply_state(state)
 
     refresh_dashboard()
-    if QTimer is not object:
+    if live_updates and QTimer is not object:
         timer = QTimer(card)
         timer.setInterval(1500)
         timer.timeout.connect(refresh_dashboard)
         timer.start()
+
+    if owns_provider:
+        card.destroyed.connect(lambda *_args, tracked_provider=provider: tracked_provider.close())
 
     return card
 

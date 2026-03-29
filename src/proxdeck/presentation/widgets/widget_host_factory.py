@@ -4,6 +4,7 @@ from collections.abc import Callable
 
 from proxdeck.domain.models.widget_definition import WidgetDefinition
 from proxdeck.domain.models.widget_instance import WidgetInstance
+from proxdeck.infrastructure.system.windows_media_session_reader import WindowsMediaSessionReader
 from proxdeck.presentation.widgets.clock_widget_host import build_clock_widget_host
 from proxdeck.presentation.widgets.launcher_widget_host import build_launcher_widget_host
 from proxdeck.presentation.widgets.media_controls_widget_host import (
@@ -11,6 +12,7 @@ from proxdeck.presentation.widgets.media_controls_widget_host import (
 )
 from proxdeck.presentation.widgets.notes_widget_host import build_notes_widget_host
 from proxdeck.presentation.widgets.system_stats_widget_host import (
+    WindowsSystemStatsProvider,
     build_system_stats_widget_host,
 )
 from proxdeck.presentation.widgets.web_widget_host import build_web_widget_host
@@ -27,7 +29,13 @@ except ModuleNotFoundError:  # pragma: no cover - optional during headless tests
 
 
 class WidgetHostFactory:
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        media_session_reader: WindowsMediaSessionReader | None = None,
+        system_stats_provider: WindowsSystemStatsProvider | None = None,
+    ) -> None:
+        self._media_session_reader = media_session_reader or WindowsMediaSessionReader()
+        self._system_stats_provider = system_stats_provider or WindowsSystemStatsProvider()
         self._builders: dict[str, Callable[[WidgetInstance, WidgetDefinition | None], QWidget]] = {
             "clock": self._build_clock_widget,
             "community-browser": self._build_community_browser_widget,
@@ -43,6 +51,7 @@ class WidgetHostFactory:
         widget_instance: WidgetInstance,
         widget_definition: WidgetDefinition | None = None,
         on_widget_settings_changed: Callable[[str, dict[str, object]], None] | None = None,
+        live_updates: bool = True,
     ) -> QWidget:
         if Qt is None:
             raise RuntimeError("PySide6 is required to build runtime widgets")
@@ -55,12 +64,17 @@ class WidgetHostFactory:
             )
 
         builder = self._builders.get(widget_instance.widget_id, self._build_unknown_widget)
+        if widget_instance.widget_id == "clock":
+            return self._build_clock_widget(widget_instance, widget_definition, live_updates=live_updates)
+        if widget_instance.widget_id == "system-stats":
+            return self._build_system_stats_widget(widget_instance, widget_definition, live_updates=live_updates)
+        if widget_instance.widget_id == "media-controls":
+            return self._build_media_controls_widget(widget_instance, widget_definition, live_updates=live_updates)
         return builder(widget_instance, widget_definition)
 
     def _build_card(
         self,
         detail: str,
-        accent: str,
     ) -> QWidget:
         card = QFrame()
         card.setFrameStyle(QFrame.Shape.Box | QFrame.Shadow.Plain)
@@ -87,11 +101,13 @@ class WidgetHostFactory:
         self,
         widget_instance: WidgetInstance,
         widget_definition: WidgetDefinition | None,
+        live_updates: bool = True,
     ) -> QWidget:
         return build_clock_widget_host(
             widget_instance=widget_instance,
             widget_definition=widget_definition,
             footer=self._build_metadata_footer(widget_definition),
+            live_updates=live_updates,
         )
 
     def _build_launcher_widget(
@@ -112,7 +128,6 @@ class WidgetHostFactory:
     ) -> QWidget:
         return self._build_card(
             detail="Sample installable widget placeholder discovered from installable_widgets/.",
-            accent="#4ED0C3",
         )
 
     def _build_notes_widget(
@@ -132,11 +147,14 @@ class WidgetHostFactory:
         self,
         widget_instance: WidgetInstance,
         widget_definition: WidgetDefinition | None,
+        live_updates: bool = True,
     ) -> QWidget:
         return build_system_stats_widget_host(
             widget_instance=widget_instance,
             widget_definition=widget_definition,
             footer=self._build_metadata_footer(widget_definition),
+            provider=self._system_stats_provider,
+            live_updates=live_updates,
         )
 
     def _build_web_widget(
@@ -154,11 +172,14 @@ class WidgetHostFactory:
         self,
         widget_instance: WidgetInstance,
         widget_definition: WidgetDefinition | None,
+        live_updates: bool = True,
     ) -> QWidget:
         return build_media_controls_widget_host(
             widget_instance=widget_instance,
             widget_definition=widget_definition,
             footer=self._build_metadata_footer(widget_definition),
+            session_reader=self._media_session_reader,
+            live_updates=live_updates,
         )
 
     def _build_unknown_widget(
@@ -168,7 +189,6 @@ class WidgetHostFactory:
     ) -> QWidget:
         return self._build_card(
             detail=f"No runtime presenter is registered for {widget_instance.widget_id}.",
-            accent="#7B8794",
         )
 
     def _build_metadata_footer(self, widget_definition: WidgetDefinition | None) -> str:

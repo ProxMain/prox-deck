@@ -202,7 +202,11 @@ class ManagementView(QWidget):
             on_select_instance=self._handle_preview_select,
             on_add_widget=self._handle_preview_add,
             on_activate_cell=self._handle_preview_cell_activate,
-            render_widget_preview=lambda instance, definition: self._widget_host_factory.create_widget(instance, definition),
+            render_widget_preview=lambda instance, definition: self._widget_host_factory.create_widget(
+                instance,
+                definition,
+                live_updates=False,
+            ),
         )
         self._layout_preview.setMinimumHeight(620)
         layout.addWidget(self._layout_preview, 1)

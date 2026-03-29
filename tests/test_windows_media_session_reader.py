@@ -18,7 +18,11 @@ def test_reader_returns_unavailable_when_no_session_is_reported() -> None:
     def runner(command: list[str], timeout: float) -> subprocess.CompletedProcess[str]:
         return subprocess.CompletedProcess(command, 0, stdout='{"available":false}', stderr="")
 
-    reader = WindowsMediaSessionReader(runner=runner)
+    reader = WindowsMediaSessionReader(
+        runner=runner,
+        audio_reader=unavailable_media_session,
+        start_background_polling=False,
+    )
 
     assert reader.read_current_session() == unavailable_media_session()
 
@@ -32,7 +36,11 @@ def test_reader_builds_snapshot_from_media_payload() -> None:
             stderr="",
         )
 
-    reader = WindowsMediaSessionReader(runner=runner)
+    reader = WindowsMediaSessionReader(
+        runner=runner,
+        audio_reader=unavailable_media_session,
+        start_background_polling=False,
+    )
 
     assert reader.read_current_session() == MediaSessionSnapshot(
         title="Nightcall",
@@ -40,6 +48,7 @@ def test_reader_builds_snapshot_from_media_payload() -> None:
         source_app="Spotify",
         position_seconds=None,
         duration_seconds=None,
+        audio_level=None,
         is_playing=None,
         is_available=True,
     )
@@ -58,7 +67,11 @@ def test_reader_builds_snapshot_with_timeline_payload() -> None:
             stderr="",
         )
 
-    reader = WindowsMediaSessionReader(runner=runner)
+    reader = WindowsMediaSessionReader(
+        runner=runner,
+        audio_reader=unavailable_media_session,
+        start_background_polling=False,
+    )
 
     assert reader.read_current_session() == MediaSessionSnapshot(
         title="Nightcall",
@@ -66,6 +79,7 @@ def test_reader_builds_snapshot_with_timeline_payload() -> None:
         source_app="Spotify",
         position_seconds=42.5,
         duration_seconds=180.0,
+        audio_level=None,
         is_playing=True,
         is_available=True,
     )

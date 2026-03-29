@@ -46,7 +46,7 @@ class ClockDisplayState:
 try:
     from PySide6.QtCore import QTimer, Qt
     from PySide6.QtGui import QColor, QConicalGradient, QFont, QLinearGradient, QPainter, QPen, QRadialGradient
-    from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QVBoxLayout, QWidget
+    from PySide6.QtWidgets import QFrame, QLabel, QVBoxLayout, QWidget
 except ModuleNotFoundError:  # pragma: no cover - optional during headless tests
     QTimer = object
     Qt = object
@@ -58,7 +58,6 @@ except ModuleNotFoundError:  # pragma: no cover - optional during headless tests
     QPen = object
     QRadialGradient = object
     QFrame = object
-    QHBoxLayout = object
     QLabel = object
     QVBoxLayout = object
     QWidget = object
@@ -84,6 +83,7 @@ def build_clock_widget_host(
     widget_instance: WidgetInstance,
     widget_definition: WidgetDefinition | None,
     footer: str,
+    live_updates: bool = True,
 ) -> QWidget:
     card = QFrame()
     card.setStyleSheet(
@@ -99,14 +99,6 @@ def build_clock_widget_host(
     layout = QVBoxLayout(card)
     layout.setContentsMargins(16, 16, 16, 16)
     layout.setSpacing(10)
-
-    top_bar = QWidget(card)
-    top_layout = QHBoxLayout(top_bar)
-    top_layout.setContentsMargins(0, 0, 0, 0)
-    top_layout.setSpacing(8)
-
-    top_layout.addStretch(1)
-    layout.addWidget(top_bar)
 
     dial = _ClockHudScene()
     dial.setMinimumHeight(220)
@@ -131,7 +123,7 @@ def build_clock_widget_host(
         date_label.setText(state.date_text)
 
     refresh_clock()
-    if QTimer is not object:
+    if live_updates and QTimer is not object:
         timer = QTimer(card)
         timer.setInterval(1000)
         timer.timeout.connect(refresh_clock)

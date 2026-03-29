@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import subprocess
+import threading
+import time
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -13,12 +15,17 @@ class MediaSessionSnapshot:
     source_app: str
     position_seconds: float | None
     duration_seconds: float | None
+    audio_level: float | None
     is_playing: bool | None
     is_available: bool
 
 
 class CommandRunner(Protocol):
     def __call__(self, command: list[str], timeout: float) -> subprocess.CompletedProcess[str]: ...
+
+
+class AudioSessionReader(Protocol):
+    def __call__(self) -> MediaSessionSnapshot: ...
 
 
 POWERSHELL_MEDIA_SESSION_SCRIPT = """
@@ -55,10 +62,46 @@ function Convert-HnsToSeconds($value) {
 
 
 class WindowsMediaSessionReader:
-    def __init__(self, runner: CommandRunner | None = None) -> None:
+    def __init__(
+        self,
+        runner: CommandRunner | None = None,
+        audio_reader: AudioSessionReader | None = None,
+        start_background_polling: bool = True,
+    ) -> None:
         self._runner = runner or _run_command
+        self._audio_reader = audio_reader or _read_from_audio_sessions
+        self._powershell_retry_after = 0.0
+        self._cached_snapshot = unavailable_media_session()
+        self._lock = threading.Lock()
+        self._stop_event = threading.Event()
+        self._poll_thread: threading.Thread | None = None
+        if start_background_polling:
+            self._cached_snapshot = self._poll_once()
+            self._poll_thread = threading.Thread(target=self._poll_loop, name="media-session-reader", daemon=True)
+            self._poll_thread.start()
 
     def read_current_session(self) -> MediaSessionSnapshot:
+        if self._poll_thread is None:
+            return self._poll_once()
+        with self._lock:
+            return self._cached_snapshot
+
+    def close(self) -> None:
+        self._stop_event.set()
+        if self._poll_thread is not None:
+            self._poll_thread.join(timeout=0.2)
+
+    def _poll_loop(self) -> None:
+        while not self._stop_event.wait(0.033):
+            snapshot = self._poll_once()
+            with self._lock:
+                self._cached_snapshot = snapshot
+
+    def _poll_once(self) -> MediaSessionSnapshot:
+        audio_snapshot = self._audio_reader()
+        now = time.monotonic()
+        if now < self._powershell_retry_after:
+            return audio_snapshot if audio_snapshot.is_available else unavailable_media_session()
         try:
             completed = self._runner(
                 [
@@ -71,19 +114,24 @@ class WindowsMediaSessionReader:
                 2.5,
             )
         except (OSError, subprocess.TimeoutExpired):
-            return unavailable_media_session()
+            self._powershell_retry_after = now + 10.0
+            return audio_snapshot if audio_snapshot.is_available else unavailable_media_session()
+
+        if _is_blocked_powershell_result(completed.stderr):
+            self._powershell_retry_after = now + 30.0
+            return audio_snapshot if audio_snapshot.is_available else unavailable_media_session()
 
         payload = _extract_json_object(completed.stdout)
         if payload is None:
-            return unavailable_media_session()
+            return audio_snapshot if audio_snapshot.is_available else unavailable_media_session()
 
         try:
             decoded = json.loads(payload)
         except json.JSONDecodeError:
-            return unavailable_media_session()
+            return audio_snapshot if audio_snapshot.is_available else unavailable_media_session()
 
         if not decoded.get("available"):
-            return unavailable_media_session()
+            return audio_snapshot if audio_snapshot.is_available else unavailable_media_session()
 
         source_value = str(decoded.get("source") or "")
         return MediaSessionSnapshot(
@@ -92,7 +140,8 @@ class WindowsMediaSessionReader:
             source_app=format_source_app_name(source_value),
             position_seconds=_coerce_optional_seconds(decoded.get("position")),
             duration_seconds=_coerce_optional_seconds(decoded.get("duration")),
-            is_playing=_coerce_playback_state(decoded.get("playback")),
+            audio_level=audio_snapshot.audio_level,
+            is_playing=_coerce_playback_state(decoded.get("playback")) if decoded.get("playback") is not None else audio_snapshot.is_playing,
             is_available=True,
         )
 
@@ -104,6 +153,7 @@ def unavailable_media_session() -> MediaSessionSnapshot:
         source_app="Waiting For Session",
         position_seconds=None,
         duration_seconds=None,
+        audio_level=None,
         is_playing=None,
         is_available=False,
     )
@@ -176,3 +226,57 @@ def _coerce_playback_state(value: object) -> bool | None:
     if normalized in {"paused", "stopped"}:
         return False
     return None
+
+
+def _is_blocked_powershell_result(stderr: str) -> bool:
+    lowered = stderr.lower()
+    return (
+        "constrainedlanguage" in lowered
+        or "method invocation is supported only on core types" in lowered
+        or "null-valued expression" in lowered
+    )
+
+
+def _read_from_audio_sessions() -> MediaSessionSnapshot:
+    try:
+        from pycaw.pycaw import AudioUtilities, IAudioMeterInformation
+    except ModuleNotFoundError:
+        return unavailable_media_session()
+
+    candidates: list[tuple[float, MediaSessionSnapshot]] = []
+    for session in AudioUtilities.GetAllSessions():
+        process = session.Process.name() if session.Process else ""
+        display_name = str(session.DisplayName or "").strip()
+        session_name = display_name or process
+        if not session_name:
+            continue
+        lowered_process = process.lower()
+        if lowered_process in {"audiodg.exe", "svchost.exe"}:
+            continue
+
+        try:
+            meter = session._ctl.QueryInterface(IAudioMeterInformation)
+            audio_level = round(float(meter.GetPeakValue()), 3)
+        except Exception:
+            audio_level = 0.0
+
+        state = int(getattr(session, "State", 0))
+        source_app = format_source_app_name(process or session_name)
+        snapshot = MediaSessionSnapshot(
+            title=source_app,
+            artist="Active audio session",
+            source_app=source_app,
+            position_seconds=None,
+            duration_seconds=None,
+            audio_level=audio_level,
+            is_playing=(audio_level > 0.01) or state == 1,
+            is_available=True,
+        )
+        score = (120.0 if state == 1 else 0.0) + (audio_level * 100.0) + (15.0 if display_name else 0.0)
+        candidates.append((score, snapshot))
+
+    if not candidates:
+        return unavailable_media_session()
+
+    candidates.sort(key=lambda item: item[0], reverse=True)
+    return candidates[0][1]
