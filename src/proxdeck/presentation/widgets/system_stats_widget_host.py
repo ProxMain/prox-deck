@@ -495,7 +495,7 @@ def build_system_stats_widget_host(
         "background: qradialgradient(cx:0.24, cy:0.18, radius:1.15, fx:0.24, fy:0.18, "
         "stop:0 #10243B, stop:0.34 #091320, stop:0.72 #060C14, stop:1 #04070D);"
         "border: none;"
-        "border-radius: 28px;"
+        "border-radius: 0px;"
         "}"
     )
 
@@ -593,7 +593,7 @@ class _CircularTelemetryPanel(_SystemStatsPanel):
         shell_gradient.setColorAt(1.0, QColor(4, 8, 14, 252))
         painter.setBrush(shell_gradient)
         painter.setPen(Qt.PenStyle.NoPen)
-        painter.drawRoundedRect(rect, 28, 28)
+        painter.drawRect(rect)
 
     def _draw_overline(self, painter: QPainter, rect: QRectF) -> None:
         font = painter.font()

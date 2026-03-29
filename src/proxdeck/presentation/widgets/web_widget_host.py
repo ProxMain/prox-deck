@@ -106,7 +106,7 @@ def _build_browser_unavailable_card(
         "QFrame {"
         "background: #101822;"
         "border: none;"
-        "border-radius: 14px;"
+        "border-radius: 0px;"
         "padding: 12px;"
         "}"
         "QLabel { color: #E7EEF7; }"

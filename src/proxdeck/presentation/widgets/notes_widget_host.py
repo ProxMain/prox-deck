@@ -28,7 +28,7 @@ def build_notes_widget_host(
         "QFrame {"
         "background: #19140A;"
         "border: none;"
-        "border-radius: 14px;"
+        "border-radius: 0px;"
         "padding: 12px;"
         "}"
         "QLabel { color: #FFF8E7; }"

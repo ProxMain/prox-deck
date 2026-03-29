@@ -55,7 +55,7 @@ def build_launcher_widget_host(
         "QFrame {"
         "background: #0F1B13;"
         "border: none;"
-        "border-radius: 14px;"
+        "border-radius: 0px;"
         "padding: 12px;"
         "}"
         "QLabel { color: #EAFBF0; }"

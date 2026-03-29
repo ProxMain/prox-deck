@@ -128,7 +128,7 @@ class RuntimeWindow(QMainWindow):
             "QFrame {"
             "background: rgba(5, 11, 18, 0.74);"
             "border: none;"
-            "border-radius: 28px;"
+            "border-radius: 0px;"
             "}"
         )
         grid_layout = QGridLayout(grid_frame)
@@ -297,7 +297,7 @@ class _GaugeBayPlaceholder(QWidget):
         shell_gradient.setColorAt(1.0, QColor(4, 8, 14, 248))
         painter.setBrush(shell_gradient)
         painter.setPen(Qt.PenStyle.NoPen)
-        painter.drawRoundedRect(rect, 22, 22)
+        painter.drawRect(rect)
 
         dial_rect = rect.adjusted(26, 22, -26, -54)
         dial_size = min(dial_rect.width(), dial_rect.height())

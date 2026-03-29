@@ -63,7 +63,7 @@ def build_media_controls_widget_host(
         "background: qradialgradient(cx:0.22, cy:0.18, radius:1.05, fx:0.22, fy:0.18, "
         "stop:0 #3A2418, stop:0.3 #24160F, stop:0.72 #140D09, stop:1 #090605);"
         "border: none;"
-        "border-radius: 28px;"
+        "border-radius: 0px;"
         "}"
         "QLabel { background: transparent; border: none; }"
     )

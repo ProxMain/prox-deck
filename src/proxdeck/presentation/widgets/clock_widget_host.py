@@ -91,7 +91,7 @@ def build_clock_widget_host(
         "background: qradialgradient(cx:0.24, cy:0.18, radius:1.05, fx:0.24, fy:0.18, "
         "stop:0 #15314A, stop:0.26 #0E2134, stop:0.62 #08121C, stop:1 #050910);"
         "border: none;"
-        "border-radius: 28px;"
+        "border-radius: 0px;"
         "}"
         "QLabel { background: transparent; border: none; }"
     )
