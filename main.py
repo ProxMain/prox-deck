@@ -3,6 +3,11 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+PROJECT_ROOT = Path(__file__).resolve().parent
+SRC_ROOT = PROJECT_ROOT / "src"
+if str(SRC_ROOT) not in sys.path:
+    sys.path.insert(0, str(SRC_ROOT))
+
 from proxdeck.bootstrap.app_factory import AppFactory
 
 try:
@@ -14,9 +19,8 @@ except ModuleNotFoundError as error:  # pragma: no cover - startup guard
 
 
 def main() -> int:
-    project_root = Path(__file__).resolve().parent
     app = QApplication(sys.argv)
-    proxdeck = AppFactory(project_root=project_root).create()
+    proxdeck = AppFactory(project_root=PROJECT_ROOT).create()
     window = proxdeck.build_window()
     window.show()
     return app.exec()
