@@ -89,3 +89,15 @@ class ManagementController:
             url=url,
             force_mobile=force_mobile,
         )
+
+    def configure_launcher_widget(
+        self,
+        screen_id: str,
+        instance_id: str,
+        items: list[dict[str, str]],
+    ) -> Screen:
+        return self._widget_management_service.configure_launcher_widget(
+            screen_id=screen_id,
+            instance_id=instance_id,
+            items=items,
+        )

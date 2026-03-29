@@ -143,6 +143,48 @@ class WidgetManagementService:
             },
         )
 
+    def configure_launcher_widget(
+        self,
+        screen_id: str,
+        instance_id: str,
+        items: list[dict[str, str]],
+    ) -> Screen:
+        screen = next(
+            (item for item in self._screen_service.list_screens() if item.screen_id == screen_id),
+            None,
+        )
+        if screen is None:
+            raise ValueError(f"Unknown screen id: {screen_id}")
+
+        widget_instance = next(
+            (item for item in screen.layout.widget_instances if item.instance_id == instance_id),
+            None,
+        )
+        if widget_instance is None:
+            raise ValueError(f"Unknown widget instance id: {instance_id}")
+        if widget_instance.widget_id != "launcher":
+            raise ValueError("Only launcher widgets support launcher item configuration")
+
+        normalized_items = []
+        for item in items:
+            label = str(item.get("label", "")).strip()
+            target = str(item.get("target", "")).strip()
+            if not label or not target:
+                continue
+            normalized_items.append({"label": label, "target": target})
+
+        if not normalized_items:
+            raise ValueError("Launcher widgets require at least one valid launcher item")
+
+        return self._screen_service.update_widget_instance_settings(
+            screen_id=screen_id,
+            instance_id=instance_id,
+            settings={
+                **widget_instance.settings,
+                "items": normalized_items,
+            },
+        )
+
     def _generate_instance_id(self, widget_id: str) -> str:
         return f"{widget_id}-{uuid.uuid4().hex[:8]}"
 

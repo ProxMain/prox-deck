@@ -141,3 +141,31 @@ def test_management_service_builds_default_launcher_items() -> None:
     settings = screen.layout.widget_instances[0].settings
     assert settings["items"][0]["label"] == "GitHub"
     assert settings["items"][3]["target"] == "ms-settings:"
+
+
+def test_management_service_updates_launcher_items() -> None:
+    service = build_management_service()
+    screen = service.add_widget_instance(
+        screen_id="gaming",
+        widget_id="launcher",
+        column=0,
+        row=0,
+        width=1,
+        height=1,
+    )
+    instance_id = screen.layout.widget_instances[0].instance_id
+
+    updated = service.configure_launcher_widget(
+        screen_id="gaming",
+        instance_id=instance_id,
+        items=[
+            {"label": "Docs", "target": "https://example.com/docs"},
+            {"label": "Mail", "target": "mailto:test@example.com"},
+        ],
+    )
+
+    settings = updated.layout.widget_instances[0].settings
+    assert settings["items"] == [
+        {"label": "Docs", "target": "https://example.com/docs"},
+        {"label": "Mail", "target": "mailto:test@example.com"},
+    ]

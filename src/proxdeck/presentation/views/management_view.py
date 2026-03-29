@@ -16,6 +16,7 @@ try:
     from PySide6.QtWidgets import (
         QCheckBox,
         QComboBox,
+        QFormLayout,
         QHBoxLayout,
         QLabel,
         QLineEdit,
@@ -31,6 +32,7 @@ except ModuleNotFoundError:  # pragma: no cover - optional during headless tests
     Qt = None
     QCheckBox = object
     QComboBox = object
+    QFormLayout = object
     QHBoxLayout = object
     QLabel = object
     QLineEdit = object
@@ -68,6 +70,8 @@ class ManagementView(QWidget):
         self._widget_instance_list: QListWidget | None = None
         self._web_url_input: QLineEdit | None = None
         self._web_mobile_checkbox: QCheckBox | None = None
+        self._launcher_label_inputs: list[QLineEdit] = []
+        self._launcher_target_inputs: list[QLineEdit] = []
         self._column_input: QSpinBox | None = None
         self._row_input: QSpinBox | None = None
         self._width_input: QSpinBox | None = None
@@ -79,6 +83,7 @@ class ManagementView(QWidget):
         self._suggest_placement_button: QPushButton | None = None
         self._remove_widget_button: QPushButton | None = None
         self._save_web_button: QPushButton | None = None
+        self._save_launcher_button: QPushButton | None = None
 
         self._build_ui()
 
@@ -166,6 +171,22 @@ class ManagementView(QWidget):
         self._save_web_button = QPushButton("Save Web Settings")
         self._save_web_button.clicked.connect(self._handle_save_web_settings)
         layout.addWidget(self._save_web_button)
+
+        layout.addWidget(QLabel("Launcher configuration"))
+        launcher_form = QFormLayout()
+        for index in range(4):
+            label_input = QLineEdit()
+            label_input.setPlaceholderText(f"Action {index + 1} label")
+            target_input = QLineEdit()
+            target_input.setPlaceholderText(f"Action {index + 1} target")
+            self._launcher_label_inputs.append(label_input)
+            self._launcher_target_inputs.append(target_input)
+            launcher_form.addRow(label_input, target_input)
+        layout.addLayout(launcher_form)
+
+        self._save_launcher_button = QPushButton("Save Launcher Settings")
+        self._save_launcher_button.clicked.connect(self._handle_save_launcher_settings)
+        layout.addWidget(self._save_launcher_button)
 
         self._refresh_management_instances()
         self._apply_selected_size_preset()
@@ -296,6 +317,7 @@ class ManagementView(QWidget):
         if current_item is None:
             self._web_url_input.clear()
             self._web_mobile_checkbox.setChecked(False)
+            self._clear_launcher_settings()
             self._refresh_instance_metadata(None)
             return
 
@@ -308,14 +330,25 @@ class ManagementView(QWidget):
             (item for item in screen.layout.widget_instances if item.instance_id == instance_id),
             None,
         )
-        if instance is None or instance.widget_id != "web":
+        if instance is None:
             self._web_url_input.clear()
             self._web_mobile_checkbox.setChecked(False)
+            self._clear_launcher_settings()
             self._refresh_instance_metadata(instance)
             return
 
-        self._web_url_input.setText(str(instance.settings.get("url", "")))
-        self._web_mobile_checkbox.setChecked(bool(instance.settings.get("force_mobile", False)))
+        if instance.widget_id == "web":
+            self._web_url_input.setText(str(instance.settings.get("url", "")))
+            self._web_mobile_checkbox.setChecked(bool(instance.settings.get("force_mobile", False)))
+        else:
+            self._web_url_input.clear()
+            self._web_mobile_checkbox.setChecked(False)
+
+        if instance.widget_id == "launcher":
+            self._load_launcher_settings(instance.settings.get("items"))
+        else:
+            self._clear_launcher_settings()
+
         self._refresh_instance_metadata(instance)
 
     def _handle_save_web_settings(self) -> None:
@@ -340,6 +373,36 @@ class ManagementView(QWidget):
             )
         except ValueError as error:
             QMessageBox.warning(self, "Web widget configuration failed", str(error))
+            return
+
+        self.refresh()
+        self._notify_state_changed()
+
+    def _handle_save_launcher_settings(self) -> None:
+        if self._management_screen_selector is None or self._widget_instance_list is None:
+            return
+
+        current_item = self._widget_instance_list.currentItem()
+        if current_item is None:
+            return
+
+        try:
+            self._management_controller.configure_launcher_widget(
+                screen_id=self._management_screen_selector.currentData(),
+                instance_id=current_item.data(Qt.ItemDataRole.UserRole),
+                items=[
+                    {
+                        "label": label_input.text(),
+                        "target": target_input.text(),
+                    }
+                    for label_input, target_input in zip(
+                        self._launcher_label_inputs,
+                        self._launcher_target_inputs,
+                    )
+                ],
+            )
+        except ValueError as error:
+            QMessageBox.warning(self, "Launcher configuration failed", str(error))
             return
 
         self.refresh()
@@ -425,10 +488,13 @@ class ManagementView(QWidget):
             self._widget_instance_list,
             self._web_url_input,
             self._web_mobile_checkbox,
+            *self._launcher_label_inputs,
+            *self._launcher_target_inputs,
             self._add_widget_button,
             self._suggest_placement_button,
             self._remove_widget_button,
             self._save_web_button,
+            self._save_launcher_button,
         ):
             if widget is not None:
                 widget.setEnabled(ui_state.editable)
@@ -441,7 +507,26 @@ class ManagementView(QWidget):
                 self._web_url_input.clear()
             if self._web_mobile_checkbox is not None:
                 self._web_mobile_checkbox.setChecked(False)
+            self._clear_launcher_settings()
             self._refresh_instance_metadata(None)
+
+    def _load_launcher_settings(self, items) -> None:
+        self._clear_launcher_settings()
+        if not isinstance(items, list):
+            return
+        for index, item in enumerate(items[: len(self._launcher_label_inputs)]):
+            if not isinstance(item, dict):
+                continue
+            self._launcher_label_inputs[index].setText(str(item.get("label", "")))
+            self._launcher_target_inputs[index].setText(str(item.get("target", "")))
+
+    def _clear_launcher_settings(self) -> None:
+        for label_input, target_input in zip(
+            self._launcher_label_inputs,
+            self._launcher_target_inputs,
+        ):
+            label_input.clear()
+            target_input.clear()
 
     @staticmethod
     def build_screen_ui_state(screen: Screen) -> ManagementScreenUiState:
