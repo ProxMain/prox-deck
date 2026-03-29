@@ -9,6 +9,7 @@ from proxdeck.domain.models.screen import Screen
 from proxdeck.domain.models.widget_definition import WidgetDefinition
 from proxdeck.domain.models.widget_instance import WidgetInstance
 from proxdeck.domain.policies.widget_placement_finder import WidgetPlacementFinder
+from proxdeck.domain.value_objects.widget_size import WidgetSize
 from proxdeck.domain.value_objects.widget_placement import WidgetPlacement
 
 
@@ -52,6 +53,24 @@ class WidgetManagementService:
         )
         return self._screen_service.add_widget_instance(screen_id, widget_instance)
 
+    def add_widget_instance_from_preset(
+        self,
+        screen_id: str,
+        widget_id: str,
+        column: int,
+        row: int,
+        size_preset: str,
+    ) -> Screen:
+        _, width, height = WidgetSize.from_preset(size_preset)
+        return self.add_widget_instance(
+            screen_id=screen_id,
+            widget_id=widget_id,
+            column=column,
+            row=row,
+            width=width,
+            height=height,
+        )
+
     def remove_widget_instance(self, screen_id: str, instance_id: str) -> Screen:
         return self._screen_service.remove_widget_instance(screen_id, instance_id)
 
@@ -71,6 +90,20 @@ class WidgetManagementService:
 
         return self._widget_placement_finder.find_first_available(
             layout=screen.layout,
+            screen_id=screen_id,
+            widget_id=widget_id,
+            width=width,
+            height=height,
+        )
+
+    def suggest_placement_for_preset(
+        self,
+        screen_id: str,
+        widget_id: str,
+        size_preset: str,
+    ) -> WidgetPlacement | None:
+        _, width, height = WidgetSize.from_preset(size_preset)
+        return self.suggest_placement(
             screen_id=screen_id,
             widget_id=widget_id,
             width=width,

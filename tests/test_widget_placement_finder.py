@@ -13,6 +13,7 @@ from proxdeck.domain.policies.widget_compatibility_policy import (
 from proxdeck.domain.policies.widget_placement_finder import WidgetPlacementFinder
 from proxdeck.domain.value_objects.app_version import AppVersion
 from proxdeck.domain.value_objects.widget_placement import WidgetPlacement
+from proxdeck.domain.value_objects.widget_size import WidgetSize
 from proxdeck.infrastructure.widgets.discovered_widget_catalog import (
     DiscoveredWidgetCatalog,
 )
@@ -135,3 +136,24 @@ def test_widget_management_service_returns_none_when_no_slot_fits() -> None:
     )
 
     assert placement is None
+
+
+def test_widget_size_preset_maps_to_expected_dimensions() -> None:
+    size, width, height = WidgetSize.from_preset("2/6-tall")
+
+    assert size.area == 2
+    assert (width, height) == (1, 2)
+
+
+def test_widget_management_service_suggests_placement_for_size_preset() -> None:
+    service = build_management_service()
+
+    placement = service.suggest_placement_for_preset(
+        screen_id="gaming",
+        widget_id="notes",
+        size_preset="4/6",
+    )
+
+    assert placement is not None
+    assert placement.width == 2
+    assert placement.height == 2

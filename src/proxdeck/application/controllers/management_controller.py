@@ -31,6 +31,22 @@ class ManagementController:
             height=height,
         )
 
+    def add_widget_instance_from_preset(
+        self,
+        screen_id: str,
+        widget_id: str,
+        column: int,
+        row: int,
+        size_preset: str,
+    ) -> Screen:
+        return self._widget_management_service.add_widget_instance_from_preset(
+            screen_id=screen_id,
+            widget_id=widget_id,
+            column=column,
+            row=row,
+            size_preset=size_preset,
+        )
+
     def remove_widget_instance(self, screen_id: str, instance_id: str) -> Screen:
         return self._widget_management_service.remove_widget_instance(screen_id, instance_id)
 
@@ -46,6 +62,18 @@ class ManagementController:
             widget_id=widget_id,
             width=width,
             height=height,
+        )
+
+    def suggest_placement_for_preset(
+        self,
+        screen_id: str,
+        widget_id: str,
+        size_preset: str,
+    ) -> WidgetPlacement | None:
+        return self._widget_management_service.suggest_placement_for_preset(
+            screen_id=screen_id,
+            widget_id=widget_id,
+            size_preset=size_preset,
         )
 
     def configure_web_widget(

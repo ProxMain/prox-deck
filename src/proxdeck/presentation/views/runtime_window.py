@@ -7,6 +7,7 @@ from proxdeck.application.controllers.runtime_controller import RuntimeControlle
 from proxdeck.application.dto.management_state import ManagementState
 from proxdeck.application.dto.runtime_state import RuntimeState
 from proxdeck.domain.models.screen import Screen
+from proxdeck.domain.value_objects.widget_size import SIZE_PRESET_DIMENSIONS, WidgetSize
 from proxdeck.presentation.widgets.widget_host_factory import WidgetHostFactory
 
 try:
@@ -76,6 +77,7 @@ class RuntimeWindow(QMainWindow):
         self._content_stack: QStackedWidget | None = None
         self._management_screen_selector: QComboBox | None = None
         self._management_widget_selector: QComboBox | None = None
+        self._size_preset_selector: QComboBox | None = None
         self._widget_instance_list: QListWidget | None = None
         self._web_url_input: QLineEdit | None = None
         self._web_mobile_checkbox: QCheckBox | None = None
@@ -173,6 +175,12 @@ class RuntimeWindow(QMainWindow):
         )
         layout.addWidget(self._management_widget_selector)
 
+        self._size_preset_selector = QComboBox()
+        for preset in SIZE_PRESET_DIMENSIONS:
+            self._size_preset_selector.addItem(preset, preset)
+        self._size_preset_selector.currentIndexChanged.connect(self._apply_selected_size_preset)
+        layout.addWidget(self._size_preset_selector)
+
         self._definition_metadata_label = QLabel()
         self._definition_metadata_label.setWordWrap(True)
         layout.addWidget(self._definition_metadata_label)
@@ -224,6 +232,7 @@ class RuntimeWindow(QMainWindow):
         layout.addWidget(save_web_button)
 
         self._refresh_management_instances()
+        self._apply_selected_size_preset()
         self._refresh_definition_metadata()
         return widget
 
@@ -318,6 +327,7 @@ class RuntimeWindow(QMainWindow):
         if (
             self._management_screen_selector is None
             or self._management_widget_selector is None
+            or self._size_preset_selector is None
             or self._column_input is None
             or self._row_input is None
             or self._width_input is None
@@ -326,13 +336,12 @@ class RuntimeWindow(QMainWindow):
             return
 
         try:
-            self._management_controller.add_widget_instance(
+            self._management_controller.add_widget_instance_from_preset(
                 screen_id=self._management_screen_selector.currentData(),
                 widget_id=self._management_widget_selector.currentData(),
                 column=self._column_input.value(),
                 row=self._row_input.value(),
-                width=self._width_input.value(),
-                height=self._height_input.value(),
+                size_preset=self._size_preset_selector.currentData(),
             )
         except ValueError as error:
             QMessageBox.warning(self, "Widget placement rejected", str(error))
@@ -345,6 +354,7 @@ class RuntimeWindow(QMainWindow):
         if (
             self._management_screen_selector is None
             or self._management_widget_selector is None
+            or self._size_preset_selector is None
             or self._column_input is None
             or self._row_input is None
             or self._width_input is None
@@ -353,11 +363,10 @@ class RuntimeWindow(QMainWindow):
             return
 
         try:
-            placement = self._management_controller.suggest_placement(
+            placement = self._management_controller.suggest_placement_for_preset(
                 screen_id=self._management_screen_selector.currentData(),
                 widget_id=self._management_widget_selector.currentData(),
-                width=self._width_input.value(),
-                height=self._height_input.value(),
+                size_preset=self._size_preset_selector.currentData(),
             )
         except ValueError as error:
             QMessageBox.warning(self, "Placement suggestion failed", str(error))
@@ -373,6 +382,19 @@ class RuntimeWindow(QMainWindow):
 
         self._column_input.setValue(placement.column)
         self._row_input.setValue(placement.row)
+
+    def _apply_selected_size_preset(self, *_args) -> None:
+        if (
+            self._size_preset_selector is None
+            or self._width_input is None
+            or self._height_input is None
+        ):
+            return
+
+        preset = self._size_preset_selector.currentData()
+        _, width, height = WidgetSize.from_preset(preset)
+        self._width_input.setValue(width)
+        self._height_input.setValue(height)
 
     def _handle_remove_widget(self) -> None:
         if self._management_screen_selector is None or self._widget_instance_list is None:
