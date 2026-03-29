@@ -28,12 +28,19 @@ from proxdeck.infrastructure.widgets.widget_discovery_root import WidgetDiscover
 class InMemoryScreenRepository(ScreenRepository):
     def __init__(self) -> None:
         self.saved_screens: list[Screen] = []
+        self.active_screen_id: str | None = None
 
     def list_screens(self) -> list[Screen]:
         return list(self.saved_screens)
 
+    def get_active_screen_id(self) -> str | None:
+        return self.active_screen_id
+
     def save_screens(self, screens: list[Screen]) -> None:
         self.saved_screens = list(screens)
+
+    def save_active_screen_id(self, screen_id: str) -> None:
+        self.active_screen_id = screen_id
 
 
 def build_widget_catalog() -> DiscoveredWidgetCatalog:
@@ -97,3 +104,38 @@ def test_screen_service_persists_widget_addition() -> None:
 
     assert len(updated.layout.widget_instances) == 1
     assert repository.list_screens()[0].layout.widget_instances[0].widget_id == "clock"
+
+
+def test_screen_service_restores_persisted_active_screen() -> None:
+    repository = InMemoryScreenRepository()
+    service = ScreenService(
+        screen_repository=repository,
+        widget_catalog=build_widget_catalog(),
+        default_screen_factory=DefaultScreenFactory(),
+        layout_policy=LayoutPolicy(),
+        availability_policy=ScreenAvailabilityPolicy(),
+    )
+    service.list_screens()
+    repository.save_active_screen_id("streaming")
+
+    active_screen = service.get_active_screen()
+
+    assert active_screen.screen_id == "streaming"
+
+
+def test_screen_service_falls_back_when_persisted_screen_is_unavailable() -> None:
+    repository = InMemoryScreenRepository()
+    service = ScreenService(
+        screen_repository=repository,
+        widget_catalog=build_widget_catalog(),
+        default_screen_factory=DefaultScreenFactory(),
+        layout_policy=LayoutPolicy(),
+        availability_policy=ScreenAvailabilityPolicy(),
+    )
+    service.list_screens()
+    repository.save_active_screen_id("developing")
+
+    active_screen = service.get_active_screen()
+
+    assert active_screen.screen_id == "gaming"
+    assert repository.get_active_screen_id() == "gaming"

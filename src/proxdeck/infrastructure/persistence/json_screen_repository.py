@@ -22,9 +22,32 @@ class JsonScreenRepository(ScreenRepository):
         payload = json.loads(self._storage_path.read_text(encoding="utf-8"))
         return [self._deserialize_screen(item) for item in payload.get("screens", [])]
 
+    def get_active_screen_id(self) -> str | None:
+        if not self._storage_path.exists():
+            return None
+
+        payload = json.loads(self._storage_path.read_text(encoding="utf-8"))
+        active_screen_id = payload.get("active_screen_id")
+        if active_screen_id is None:
+            return None
+        return str(active_screen_id)
+
     def save_screens(self, screens: list[Screen]) -> None:
         self._storage_path.parent.mkdir(parents=True, exist_ok=True)
-        payload = {"screens": [self._serialize_screen(screen) for screen in screens]}
+        active_screen_id = self.get_active_screen_id()
+        payload = {
+            "active_screen_id": active_screen_id,
+            "screens": [self._serialize_screen(screen) for screen in screens],
+        }
+        self._storage_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+    def save_active_screen_id(self, screen_id: str) -> None:
+        screens = self.list_screens()
+        self._storage_path.parent.mkdir(parents=True, exist_ok=True)
+        payload = {
+            "active_screen_id": screen_id,
+            "screens": [self._serialize_screen(screen) for screen in screens],
+        }
         self._storage_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
     def _serialize_screen(self, screen: Screen) -> dict[str, object]:

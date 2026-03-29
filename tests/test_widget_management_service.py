@@ -27,12 +27,19 @@ from proxdeck.infrastructure.widgets.widget_discovery_root import WidgetDiscover
 class InMemoryScreenRepository(ScreenRepository):
     def __init__(self) -> None:
         self.saved_screens: list[Screen] = []
+        self.active_screen_id: str | None = None
 
     def list_screens(self) -> list[Screen]:
         return list(self.saved_screens)
 
+    def get_active_screen_id(self) -> str | None:
+        return self.active_screen_id
+
     def save_screens(self, screens: list[Screen]) -> None:
         self.saved_screens = list(screens)
+
+    def save_active_screen_id(self, screen_id: str) -> None:
+        self.active_screen_id = screen_id
 
 
 def build_management_service() -> WidgetManagementService:

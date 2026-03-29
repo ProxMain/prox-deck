@@ -32,17 +32,27 @@ class ScreenService:
 
         defaults = self._default_screen_factory.create_defaults()
         self._screen_repository.save_screens(defaults)
+        self._screen_repository.save_active_screen_id(defaults[0].screen_id)
         return defaults
 
     def get_active_screen(self) -> Screen:
-        for screen in self.list_screens():
+        screens = self.list_screens()
+        active_screen_id = self._screen_repository.get_active_screen_id()
+        if active_screen_id is not None:
+            for screen in screens:
+                if screen.screen_id == active_screen_id and screen.is_available():
+                    return screen
+
+        for screen in screens:
             if screen.is_available():
+                self._screen_repository.save_active_screen_id(screen.screen_id)
                 return screen
         raise ValueError("No available runtime screen was found")
 
     def switch_screen(self, screen_id: str) -> Screen:
         screen = self._find_screen(screen_id)
         self._availability_policy.ensure_accessible(screen)
+        self._screen_repository.save_active_screen_id(screen.screen_id)
         return screen
 
     def add_widget_instance(self, screen_id: str, widget_instance: WidgetInstance) -> Screen:
