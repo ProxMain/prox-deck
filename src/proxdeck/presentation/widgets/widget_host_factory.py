@@ -4,6 +4,10 @@ from collections.abc import Callable
 
 from proxdeck.domain.models.widget_definition import WidgetDefinition
 from proxdeck.domain.models.widget_instance import WidgetInstance
+from proxdeck.application.services.stream_deck_action_executor import (
+    StreamDeckActionExecutor,
+)
+from proxdeck.infrastructure.system.desktop_launch_executor import DesktopLaunchExecutor
 from proxdeck.infrastructure.system.windows_media_session_reader import WindowsMediaSessionReader
 from proxdeck.presentation.widgets.clock_widget_host import build_clock_widget_host
 from proxdeck.presentation.widgets.launcher_widget_host import build_launcher_widget_host
@@ -11,6 +15,9 @@ from proxdeck.presentation.widgets.media_controls_widget_host import (
     build_media_controls_widget_host,
 )
 from proxdeck.presentation.widgets.notes_widget_host import build_notes_widget_host
+from proxdeck.presentation.widgets.stream_deck_widget_host import (
+    build_stream_deck_widget_host,
+)
 from proxdeck.presentation.widgets.system_stats_widget_host import (
     WindowsSystemStatsProvider,
     build_system_stats_widget_host,
@@ -33,13 +40,18 @@ class WidgetHostFactory:
         self,
         media_session_reader: WindowsMediaSessionReader | None = None,
         system_stats_provider: WindowsSystemStatsProvider | None = None,
+        stream_deck_action_executor: StreamDeckActionExecutor | None = None,
     ) -> None:
         self._media_session_reader = media_session_reader or WindowsMediaSessionReader()
         self._system_stats_provider = system_stats_provider or WindowsSystemStatsProvider()
+        self._stream_deck_action_executor = stream_deck_action_executor or StreamDeckActionExecutor(
+            DesktopLaunchExecutor()
+        )
         self._builders: dict[str, Callable[[WidgetInstance, WidgetDefinition | None], QWidget]] = {
             "clock": self._build_clock_widget,
             "community-browser": self._build_community_browser_widget,
             "launcher": self._build_launcher_widget,
+            "stream-deck": self._build_stream_deck_widget,
             "notes": self._build_notes_widget,
             "system-stats": self._build_system_stats_widget,
             "web": self._build_web_widget,
@@ -141,6 +153,18 @@ class WidgetHostFactory:
             widget_definition=widget_definition,
             footer=self._build_metadata_footer(widget_definition),
             on_settings_changed=on_widget_settings_changed,
+        )
+
+    def _build_stream_deck_widget(
+        self,
+        widget_instance: WidgetInstance,
+        widget_definition: WidgetDefinition | None,
+    ) -> QWidget:
+        return build_stream_deck_widget_host(
+            widget_instance=widget_instance,
+            widget_definition=widget_definition,
+            footer=self._build_metadata_footer(widget_definition),
+            action_executor=self._stream_deck_action_executor,
         )
 
     def _build_system_stats_widget(

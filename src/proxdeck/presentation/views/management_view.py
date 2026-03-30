@@ -3,16 +3,30 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from proxdeck.application.services.stream_deck_configuration import (
+    STREAM_DECK_DEFAULT_BUTTON_COUNT,
+    collect_stream_deck_page_options,
+    deep_copy_stream_deck_buttons,
+    get_stream_deck_buttons_for_path,
+    normalize_stream_deck_buttons,
+    parse_stream_deck_settings,
+)
 from proxdeck.application.controllers.management_controller import ManagementController
 from proxdeck.domain.models.screen import Screen
 from proxdeck.presentation.views.layout_preview import LayoutPreviewWidget
 from proxdeck.presentation.views.scene_svg import build_svg_label
 from proxdeck.presentation.views.widget_definition_summary import format_widget_definition_summary
 from proxdeck.presentation.views.widget_palette import WidgetPaletteView
+from proxdeck.presentation.widgets.stream_deck_icon_catalog import (
+    STREAM_DECK_ICON_OPTIONS,
+    icon_catalog_asset_path,
+    normalize_stream_deck_icon_value,
+)
 from proxdeck.presentation.widgets.widget_host_factory import WidgetHostFactory
 
 try:
     from PySide6.QtCore import Qt
+    from PySide6.QtGui import QIcon
     from PySide6.QtWidgets import (
         QCheckBox,
         QComboBox,
@@ -32,6 +46,7 @@ try:
     )
 except ModuleNotFoundError:  # pragma: no cover
     Qt = None
+    QIcon = object
     QCheckBox = object
     QComboBox = object
     QFormLayout = object
@@ -47,6 +62,9 @@ except ModuleNotFoundError:  # pragma: no cover
     QScrollArea = object
     QVBoxLayout = object
     QWidget = object
+
+
+STREAM_DECK_EDITOR_SLOT_COUNT = 32
 
 
 @dataclass(frozen=True)
@@ -87,6 +105,14 @@ class ManagementView(QWidget):
         self._launcher_label_inputs: list[QLineEdit] = []
         self._launcher_target_inputs: list[QLineEdit] = []
         self._save_launcher_button: QPushButton | None = None
+        self._stream_deck_card: QGroupBox | None = None
+        self._stream_deck_size_selector: QComboBox | None = None
+        self._stream_deck_page_selector: QComboBox | None = None
+        self._stream_deck_refresh_pages_button: QPushButton | None = None
+        self._stream_deck_button_inputs: list[dict[str, object]] = []
+        self._stream_deck_editor_buttons: list[dict[str, object]] = []
+        self._stream_deck_current_page_path = ""
+        self._save_stream_deck_button: QPushButton | None = None
         self._remove_widget_button: QPushButton | None = None
         self._build_ui()
 
@@ -263,6 +289,7 @@ class ManagementView(QWidget):
         layout.addWidget(identity)
         self._build_web_card(layout)
         self._build_launcher_card(layout)
+        self._build_stream_deck_card(layout)
         layout.addStretch(1)
         body.addWidget(panel, 1)
 
@@ -314,10 +341,98 @@ class ManagementView(QWidget):
         layout.addWidget(self._launcher_card)
         self._sync_inspector_visibility(None)
 
+    def _build_stream_deck_card(self, layout: QVBoxLayout) -> None:
+        self._stream_deck_card = QGroupBox("Stream Deck Matrix")
+        stream_deck = QVBoxLayout(self._stream_deck_card)
+        hint = QLabel("Configure touch actions and choose the vertical deck format for the selected widget.")
+        hint.setObjectName("PanelText")
+        hint.setWordWrap(True)
+        stream_deck.addWidget(hint)
+        self._stream_deck_size_selector = QComboBox()
+        self._stream_deck_size_selector.addItem("1/6 Tall", "1/6")
+        self._stream_deck_size_selector.addItem("2/6 Tall", "2/6-tall")
+        stream_deck.addWidget(self._stream_deck_size_selector)
+        page_bar = QHBoxLayout()
+        self._stream_deck_page_selector = QComboBox()
+        self._stream_deck_page_selector.currentIndexChanged.connect(
+            self._handle_stream_deck_page_changed
+        )
+        page_bar.addWidget(self._stream_deck_page_selector, 1)
+        self._stream_deck_refresh_pages_button = QPushButton("Refresh Folders")
+        self._stream_deck_refresh_pages_button.clicked.connect(
+            self._refresh_stream_deck_page_selector
+        )
+        page_bar.addWidget(self._stream_deck_refresh_pages_button)
+        stream_deck.addLayout(page_bar)
+        page_hint = QLabel(
+            "Use `asset:icon_name.svg` for bundled SVG icons, or plain text like `WWW`. "
+            "Set a key to Folder and refresh to edit its child icons."
+        )
+        page_hint.setObjectName("PanelText")
+        page_hint.setWordWrap(True)
+        stream_deck.addWidget(page_hint)
+        form = QFormLayout()
+        form.setHorizontalSpacing(10)
+        form.setVerticalSpacing(8)
+        for index in range(min(STREAM_DECK_EDITOR_SLOT_COUNT, STREAM_DECK_DEFAULT_BUTTON_COUNT)):
+            label_input = QLineEdit()
+            label_input.setPlaceholderText(f"Button {index + 1} label")
+            icon_input = QComboBox()
+            icon_input.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
+            self._populate_stream_deck_icon_picker(icon_input)
+            target_input = QLineEdit()
+            target_input.setPlaceholderText("Target or executable")
+            action_type_selector = QComboBox()
+            action_type_selector.addItem("Launch", "launch")
+            action_type_selector.addItem("Folder", "group")
+            action_type_selector.addItem("Placeholder", "noop")
+            self._stream_deck_button_inputs.append(
+                {
+                    "id": f"button-{index + 1}",
+                    "label": label_input,
+                    "icon": icon_input,
+                    "action_type": action_type_selector,
+                    "target": target_input,
+                }
+            )
+            row = QWidget()
+            row_layout = QHBoxLayout(row)
+            row_layout.setContentsMargins(0, 0, 0, 0)
+            row_layout.setSpacing(8)
+            row_layout.addWidget(label_input, 2)
+            row_layout.addWidget(icon_input, 1)
+            row_layout.addWidget(action_type_selector, 1)
+            row_layout.addWidget(target_input, 3)
+            form.addRow(f"Key {index + 1}", row)
+        stream_deck.addLayout(form)
+        self._save_stream_deck_button = QPushButton("Commit Deck")
+        self._save_stream_deck_button.clicked.connect(self._handle_save_stream_deck_settings)
+        stream_deck.addWidget(self._save_stream_deck_button)
+        layout.addWidget(self._stream_deck_card)
+
     def _signal_card(self) -> QFrame:
         card = QFrame()
         card.setObjectName("SignalCard")
         return card
+
+    def _populate_stream_deck_icon_picker(self, picker: QComboBox) -> None:
+        picker.addItem("No icon", "")
+        for option in STREAM_DECK_ICON_OPTIONS:
+            icon = QIcon(str(icon_catalog_asset_path(option.asset_name))) if QIcon is not object else None
+            if icon is None:
+                picker.addItem(option.label, option.value)
+            else:
+                picker.addItem(icon, option.label, option.value)
+
+    def _ensure_stream_deck_icon_picker_value(self, picker: QComboBox, icon_value: str) -> str:
+        normalized_value = normalize_stream_deck_icon_value(icon_value)
+        if not normalized_value:
+            return ""
+        for index in range(picker.count()):
+            if picker.itemData(index) == normalized_value:
+                return normalized_value
+        picker.addItem(f"Custom: {normalized_value.split('/')[-1]}", normalized_value)
+        return normalized_value
 
     def _caption_label(self, text: str) -> QLabel:
         label = QLabel(text)
@@ -441,6 +556,7 @@ class ManagementView(QWidget):
             self._web_url_input.clear()
             self._web_mobile_checkbox.setChecked(False)
             self._clear_launcher_settings()
+            self._clear_stream_deck_settings()
             self._refresh_instance_metadata(None)
             return
         screen = self._current_screen()
@@ -464,6 +580,10 @@ class ManagementView(QWidget):
             self._load_launcher_settings(instance.settings.get("items"))
         else:
             self._clear_launcher_settings()
+        if instance.widget_id == "stream-deck":
+            self._load_stream_deck_settings(instance.settings)
+        else:
+            self._clear_stream_deck_settings()
         self._refresh_instance_metadata(instance)
         self._refresh_layout_preview(screen)
 
@@ -487,6 +607,31 @@ class ManagementView(QWidget):
             )
         except ValueError as error:
             QMessageBox.warning(self, "Web widget configuration failed", str(error))
+            return
+        self.refresh()
+        self._notify_state_changed()
+        self._refresh_layout_preview(self._current_screen())
+
+    def _handle_save_stream_deck_settings(self) -> None:
+        if (
+            self._management_screen_selector is None
+            or self._widget_instance_list is None
+            or self._stream_deck_size_selector is None
+        ):
+            return
+        current_item = self._widget_instance_list.currentItem()
+        if current_item is None:
+            return
+        self._commit_stream_deck_page()
+        try:
+            self._management_controller.configure_stream_deck_widget(
+                screen_id=self._management_screen_selector.currentData(),
+                instance_id=current_item.data(Qt.ItemDataRole.UserRole),
+                size_variant=self._stream_deck_size_selector.currentData(),
+                buttons=self._build_stream_deck_button_payload(),
+            )
+        except ValueError as error:
+            QMessageBox.warning(self, "Stream Deck configuration failed", str(error))
             return
         self.refresh()
         self._notify_state_changed()
@@ -564,6 +709,8 @@ class ManagementView(QWidget):
             self._web_card.setVisible(widget_id == "web")
         if self._launcher_card is not None:
             self._launcher_card.setVisible(widget_id == "launcher")
+        if self._stream_deck_card is not None:
+            self._stream_deck_card.setVisible(widget_id == "stream-deck")
 
     def _find_widget_definition(self, widget_id: str):
         return next(
@@ -603,9 +750,12 @@ class ManagementView(QWidget):
             self._web_mobile_checkbox,
             *self._launcher_label_inputs,
             *self._launcher_target_inputs,
+            self._stream_deck_size_selector,
+            *self._stream_deck_widgets(),
             self._remove_widget_button,
             self._save_web_button,
             self._save_launcher_button,
+            self._save_stream_deck_button,
         ):
             if widget is not None:
                 widget.setEnabled(ui_state.editable)
@@ -617,6 +767,7 @@ class ManagementView(QWidget):
             if self._web_mobile_checkbox is not None:
                 self._web_mobile_checkbox.setChecked(False)
             self._clear_launcher_settings()
+            self._clear_stream_deck_settings()
             self._refresh_instance_metadata(None)
 
     def _load_launcher_settings(self, items) -> None:
@@ -636,6 +787,189 @@ class ManagementView(QWidget):
         ):
             label_input.clear()
             target_input.clear()
+
+    def _load_stream_deck_settings(self, settings: dict[str, object]) -> None:
+        self._clear_stream_deck_settings()
+        parsed = parse_stream_deck_settings(settings)
+        self._stream_deck_editor_buttons = normalize_stream_deck_buttons(
+            deep_copy_stream_deck_buttons(
+                [
+                    {
+                        "id": button.button_id,
+                        "label": button.label,
+                        "icon": button.icon or "",
+                        "action_type": button.action_type,
+                        "action_config": button.action_config,
+                    }
+                    for button in parsed.buttons
+                ]
+            )
+        )
+        if self._stream_deck_size_selector is not None:
+            for index in range(self._stream_deck_size_selector.count()):
+                if self._stream_deck_size_selector.itemData(index) == parsed.size_variant:
+                    self._stream_deck_size_selector.setCurrentIndex(index)
+                    break
+        self._stream_deck_current_page_path = ""
+        self._refresh_stream_deck_page_selector(commit_current_page=False)
+        self._render_stream_deck_page("")
+
+    def _clear_stream_deck_settings(self) -> None:
+        if self._stream_deck_size_selector is not None:
+            self._stream_deck_size_selector.setCurrentIndex(0)
+        self._stream_deck_editor_buttons = []
+        self._stream_deck_current_page_path = ""
+        if self._stream_deck_page_selector is not None:
+            self._stream_deck_page_selector.blockSignals(True)
+            self._stream_deck_page_selector.clear()
+            self._stream_deck_page_selector.addItem("Root Deck", "")
+            self._stream_deck_page_selector.blockSignals(False)
+        for controls in self._stream_deck_button_inputs:
+            controls["label"].clear()
+            controls["icon"].setCurrentIndex(0)
+            controls["target"].clear()
+            controls["action_type"].setCurrentIndex(0)
+            controls["target"].setEnabled(True)
+
+    def _build_stream_deck_button_payload(self) -> list[dict[str, object]]:
+        return deep_copy_stream_deck_buttons(self._stream_deck_editor_buttons)
+
+    def _stream_deck_widgets(self) -> list[QWidget]:
+        widgets: list[QWidget] = []
+        for controls in self._stream_deck_button_inputs:
+            widgets.extend(
+                [
+                    controls["label"],
+                    controls["icon"],
+                    controls["target"],
+                    controls["action_type"],
+                ]
+            )
+        if self._stream_deck_page_selector is not None:
+            widgets.append(self._stream_deck_page_selector)
+        if self._stream_deck_refresh_pages_button is not None:
+            widgets.append(self._stream_deck_refresh_pages_button)
+        return widgets
+
+    def _handle_stream_deck_page_changed(self, *_args) -> None:
+        if self._stream_deck_page_selector is None:
+            return
+        self._commit_stream_deck_page()
+        self._render_stream_deck_page(str(self._stream_deck_page_selector.currentData() or ""))
+
+    def _refresh_stream_deck_page_selector(self, commit_current_page: bool = True) -> None:
+        if self._stream_deck_page_selector is None:
+            return
+        if commit_current_page:
+            self._commit_stream_deck_page()
+        options = collect_stream_deck_page_options(self._stream_deck_editor_buttons)
+        current_path = self._stream_deck_current_page_path
+        self._stream_deck_page_selector.blockSignals(True)
+        self._stream_deck_page_selector.clear()
+        for path, label in options:
+            self._stream_deck_page_selector.addItem("Root Deck" if not path else f"Folder: {label}", path)
+        selected_index = 0
+        for index in range(self._stream_deck_page_selector.count()):
+            if self._stream_deck_page_selector.itemData(index) == current_path:
+                selected_index = index
+                break
+        self._stream_deck_page_selector.setCurrentIndex(selected_index)
+        self._stream_deck_page_selector.blockSignals(False)
+        self._render_stream_deck_page(str(self._stream_deck_page_selector.currentData() or ""))
+
+    def _render_stream_deck_page(self, path: str) -> None:
+        page_buttons = normalize_stream_deck_buttons(
+            deep_copy_stream_deck_buttons(
+                get_stream_deck_buttons_for_path(self._stream_deck_editor_buttons, path)
+            ),
+            fill_to_count=False,
+        )
+        self._stream_deck_current_page_path = path
+        for index, controls in enumerate(self._stream_deck_button_inputs):
+            button = (
+                page_buttons[index]
+                if index < len(page_buttons)
+                else {
+                    "id": controls["id"],
+                    "label": "",
+                    "icon": "",
+                    "action_type": "noop",
+                    "action_config": {},
+                }
+            )
+            controls["label"].setText(str(button.get("label", "")))
+            self._set_stream_deck_icon_picker_value(controls["icon"], str(button.get("icon", "")))
+            action_config = button.get("action_config", {})
+            target = action_config.get("target", "") if isinstance(action_config, dict) else ""
+            controls["target"].setText(str(target))
+            action_type_selector = controls["action_type"]
+            for option_index in range(action_type_selector.count()):
+                if action_type_selector.itemData(option_index) == button.get("action_type"):
+                    action_type_selector.setCurrentIndex(option_index)
+                    break
+            controls["target"].setEnabled(button.get("action_type") == "launch")
+
+    def _commit_stream_deck_page(self) -> None:
+        if not self._stream_deck_editor_buttons:
+            return
+        page_buttons = get_stream_deck_buttons_for_path(
+            self._stream_deck_editor_buttons,
+            self._stream_deck_current_page_path,
+        )
+        if not page_buttons:
+            page_buttons = self._stream_deck_editor_buttons
+        committed_buttons: list[dict[str, object]] = []
+        for index, controls in enumerate(self._stream_deck_button_inputs):
+            action_type = controls["action_type"].currentData()
+            existing_action_config = (
+                page_buttons[index].get("action_config", {})
+                if index < len(page_buttons) and isinstance(page_buttons[index].get("action_config"), dict)
+                else {}
+            )
+            if action_type == "launch":
+                action_config: dict[str, object] = {"target": controls["target"].text()}
+            elif action_type == "group":
+                children = existing_action_config.get("children", [])
+                if not isinstance(children, list):
+                    children = []
+                action_config = {"children": normalize_stream_deck_buttons(children)}
+            else:
+                action_config = {}
+            committed_buttons.append(
+                {
+                    "id": (
+                        page_buttons[index].get("id", controls["id"])
+                        if index < len(page_buttons)
+                        else controls["id"]
+                    ),
+                    "label": controls["label"].text(),
+                    "icon": controls["icon"].currentData(),
+                    "action_type": action_type,
+                    "action_config": action_config,
+                }
+            )
+            controls["target"].setEnabled(action_type == "launch")
+        normalized_committed = normalize_stream_deck_buttons(committed_buttons, fill_to_count=False)
+        if len(page_buttons) < len(normalized_committed):
+            page_buttons.extend(
+                normalize_stream_deck_buttons(
+                    [],
+                    fill_to_count=False,
+                )
+            )
+        for index, button in enumerate(normalized_committed):
+            if index < len(page_buttons):
+                page_buttons[index] = button
+            else:
+                page_buttons.append(button)
+
+    def _set_stream_deck_icon_picker_value(self, picker: QComboBox, icon_value: str) -> None:
+        normalized_value = self._ensure_stream_deck_icon_picker_value(picker, icon_value)
+        for index in range(picker.count()):
+            if picker.itemData(index) == normalized_value:
+                picker.setCurrentIndex(index)
+                return
+        picker.setCurrentIndex(0)
 
     def _refresh_layout_preview(self, screen: Screen | None) -> None:
         if self._layout_preview is None:

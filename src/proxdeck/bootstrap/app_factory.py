@@ -20,6 +20,7 @@ from proxdeck.infrastructure.persistence.json_screen_repository import JsonScree
 from proxdeck.infrastructure.system.qt_screen_runtime_target_detector import (
     QtScreenRuntimeTargetDetector,
 )
+from proxdeck.infrastructure.system.steam_game_discovery import SteamGameDiscovery
 from proxdeck.infrastructure.widgets.discovered_widget_catalog import (
     DiscoveredWidgetCatalog,
 )
@@ -83,6 +84,7 @@ class AppFactory:
                 screen_service=screen_service,
                 widget_catalog=widget_catalog,
                 widget_placement_finder=WidgetPlacementFinder(LayoutPolicy()),
+                stream_deck_default_buttons_provider=SteamGameDiscovery().discover_buttons,
             )
         )
         return ProxDeckApplication(

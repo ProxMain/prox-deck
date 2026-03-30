@@ -257,13 +257,7 @@ class _PreviewTile(QFrame):
         controls_layout = QVBoxLayout(controls)
         controls_layout.setContentsMargins(0, 0, 0, 0)
         controls_layout.setSpacing(4)
-        for text, preset in (
-            ("1", "1/6"),
-            ("2W", "2/6-wide"),
-            ("2T", "2/6-tall"),
-            ("4", "4/6"),
-            ("6", "6/6"),
-        ):
+        for text, preset in _resize_presets_for_widget(self._widget_id):
             button = QPushButton(text)
             button.clicked.connect(partial(self._handle_resize_click, preset))
             button.setFixedSize(44, 28)
@@ -414,3 +408,18 @@ class _PreviewCell(QFrame):
         if event.button() == Qt.MouseButton.LeftButton:
             self._on_activate(self._column, self._row)
         super().mousePressEvent(event)
+
+
+def _resize_presets_for_widget(widget_id: str) -> tuple[tuple[str, str], ...]:
+    if widget_id == "stream-deck":
+        return (
+            ("1", "1/6"),
+            ("2T", "2/6-tall"),
+        )
+    return (
+        ("1", "1/6"),
+        ("2W", "2/6-wide"),
+        ("2T", "2/6-tall"),
+        ("4", "4/6"),
+        ("6", "6/6"),
+    )

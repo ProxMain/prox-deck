@@ -63,6 +63,7 @@ def test_discovery_catalog_loads_builtin_widget_manifests() -> None:
         "clock",
         "launcher",
         "notes",
+        "stream-deck",
         "system-stats",
         "web",
         "media-controls",

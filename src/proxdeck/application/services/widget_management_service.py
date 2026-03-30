@@ -1,9 +1,18 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Callable
 
 from proxdeck.application.dto.management_state import ManagementState
 from proxdeck.application.services.screen_service import ScreenService
+from proxdeck.application.services.stream_deck_configuration import (
+    STREAM_DECK_DEFAULT_BUTTON_COUNT,
+    build_default_stream_deck_settings,
+    build_stream_deck_settings_payload,
+    normalize_stream_deck_buttons,
+    stream_deck_dimensions_for_variant,
+    stream_deck_variant_for_dimensions,
+)
 from proxdeck.domain.contracts.widget_catalog import WidgetCatalog
 from proxdeck.domain.models.screen import Screen
 from proxdeck.domain.models.widget_definition import WidgetDefinition
@@ -19,10 +28,12 @@ class WidgetManagementService:
         screen_service: ScreenService,
         widget_catalog: WidgetCatalog,
         widget_placement_finder: WidgetPlacementFinder,
+        stream_deck_default_buttons_provider: Callable[[int], list[dict[str, object]]] | None = None,
     ) -> None:
         self._screen_service = screen_service
         self._widget_catalog = widget_catalog
         self._widget_placement_finder = widget_placement_finder
+        self._stream_deck_default_buttons_provider = stream_deck_default_buttons_provider
 
     def load_management_state(self) -> ManagementState:
         return ManagementState(
@@ -49,7 +60,7 @@ class WidgetManagementService:
                 width=width,
                 height=height,
             ),
-            settings=self._build_default_settings(widget_id),
+            settings=self._build_default_settings(widget_id, width=width, height=height),
         )
         return self._screen_service.add_widget_instance(screen_id, widget_instance)
 
@@ -213,6 +224,52 @@ class WidgetManagementService:
             },
         )
 
+    def configure_stream_deck_widget(
+        self,
+        screen_id: str,
+        instance_id: str,
+        size_variant: str,
+        buttons: list[dict[str, object]],
+    ) -> Screen:
+        screen = self._get_screen(screen_id)
+        widget_instance = self._get_widget_instance(screen, instance_id)
+        if widget_instance.widget_id != "stream-deck":
+            raise ValueError("Only stream-deck widgets support Stream Deck configuration")
+
+        width, height = stream_deck_dimensions_for_variant(size_variant)
+        placement = self._widget_placement_finder.find_best_available(
+            layout=screen.layout.without_widget_instance(instance_id),
+            screen_id=screen_id,
+            widget_id=widget_instance.widget_id,
+            width=width,
+            height=height,
+            preferred_column=widget_instance.placement.column,
+            preferred_row=widget_instance.placement.row,
+        )
+        if placement is None:
+            raise ValueError("No room is available for the selected Stream Deck size")
+
+        updated_screen = self._screen_service.update_widget_instance_placement(
+            screen_id=screen_id,
+            instance_id=instance_id,
+            column=placement.column,
+            row=placement.row,
+            width=placement.width,
+            height=placement.height,
+        )
+        updated_instance = self._get_widget_instance(updated_screen, instance_id)
+        return self._screen_service.update_widget_instance_settings(
+            screen_id=screen_id,
+            instance_id=instance_id,
+            settings={
+                **updated_instance.settings,
+                **build_stream_deck_settings_payload(
+                    size_variant=size_variant,
+                    buttons=buttons,
+                ),
+            },
+        )
+
     def update_widget_instance_placement(
         self,
         screen_id: str,
@@ -222,13 +279,30 @@ class WidgetManagementService:
         width: int,
         height: int,
     ) -> Screen:
-        return self._screen_service.update_widget_instance_placement(
+        screen = self._get_screen(screen_id)
+        widget_instance = self._get_widget_instance(screen, instance_id)
+        settings = widget_instance.settings
+        if widget_instance.widget_id == "stream-deck":
+            size_variant = stream_deck_variant_for_dimensions(width, height)
+            settings = {
+                **settings,
+                "size_variant": size_variant,
+            }
+
+        updated_screen = self._screen_service.update_widget_instance_placement(
             screen_id=screen_id,
             instance_id=instance_id,
             column=column,
             row=row,
             width=width,
             height=height,
+        )
+        if widget_instance.widget_id != "stream-deck":
+            return updated_screen
+        return self._screen_service.update_widget_instance_settings(
+            screen_id=screen_id,
+            instance_id=instance_id,
+            settings=settings,
         )
 
     def move_widget_instance_smart(
@@ -332,7 +406,12 @@ class WidgetManagementService:
             raise ValueError(f"Unknown widget instance id: {instance_id}")
         return widget_instance
 
-    def _build_default_settings(self, widget_id: str) -> dict[str, object]:
+    def _build_default_settings(
+        self,
+        widget_id: str,
+        width: int = 1,
+        height: int = 1,
+    ) -> dict[str, object]:
         if widget_id == "launcher":
             return {
                 "items": [
@@ -347,4 +426,39 @@ class WidgetManagementService:
                 "url": "https://example.com",
                 "force_mobile": False,
             }
+        if widget_id == "stream-deck":
+            settings = build_default_stream_deck_settings(
+                stream_deck_variant_for_dimensions(width, height)
+            )
+            if self._stream_deck_default_buttons_provider is None:
+                return settings
+            curated_defaults = [
+                {
+                    "id": "youtube",
+                    "label": "YouTube",
+                    "icon": "asset:stream_deck_youtube.svg",
+                    "action_type": "launch",
+                    "action_config": {"target": "https://youtube.com"},
+                },
+                {
+                    "id": "discord",
+                    "label": "Discord",
+                    "icon": "asset:stream_deck_discord.svg",
+                    "action_type": "launch",
+                    "action_config": {"target": "discord://"},
+                },
+            ]
+            base_buttons = [
+                button
+                for button in settings["buttons"]
+                if isinstance(button, dict) and button.get("action_type") != "noop"
+            ]
+            curated_defaults.extend(base_buttons)
+            extra_buttons = self._stream_deck_default_buttons_provider(
+                max(0, STREAM_DECK_DEFAULT_BUTTON_COUNT - len(curated_defaults))
+            )
+            settings["buttons"] = normalize_stream_deck_buttons(
+                [*curated_defaults, *extra_buttons]
+            )
+            return settings
         return {}

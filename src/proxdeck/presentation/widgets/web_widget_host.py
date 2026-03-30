@@ -31,6 +31,11 @@ MOBILE_USER_AGENT = (
     "Mobile/15E148 Safari/604.1"
 )
 
+IGNORED_WEB_CONSOLE_FRAGMENTS: tuple[str, ...] = (
+    "www.googletagmanager.com/gtag/js",
+    "Minified React error #418",
+)
+
 
 def normalize_web_widget_url(raw_url: object) -> str:
     candidate = str(raw_url or "").strip()
@@ -74,7 +79,7 @@ def build_web_widget_host(
     layout.setSpacing(0)
 
     browser_view = QWebEngineView(container)
-    browser_view.setPage(_build_browser_page(container, mobile))
+    browser_view.setPage(_build_browser_page(browser_view, mobile))
     browser_view.page().setBackgroundColor(QColor("#0F1722"))
     browser_view.setUrl(QUrl(url))
     layout.addWidget(browser_view, 1)
@@ -82,7 +87,7 @@ def build_web_widget_host(
 
 
 def _build_browser_page(parent: QWidget, force_mobile: bool) -> QWebEnginePage:
-    profile = QWebEngineProfile(parent)
+    profile = QWebEngineProfile()
     user_agent = build_web_widget_user_agent(force_mobile)
     if user_agent is not None:
         profile.setHttpUserAgent(user_agent)
@@ -91,7 +96,20 @@ def _build_browser_page(parent: QWidget, force_mobile: bool) -> QWebEnginePage:
     settings.setAttribute(QWebEngineSettings.WebAttribute.FullScreenSupportEnabled, True)
     settings.setAttribute(QWebEngineSettings.WebAttribute.PluginsEnabled, False)
     settings.setAttribute(QWebEngineSettings.WebAttribute.JavascriptCanOpenWindows, False)
-    return QWebEnginePage(profile, parent)
+    page = _ProxDeckWebEnginePage(profile, parent)
+    profile.setParent(page)
+    return page
+
+
+class _ProxDeckWebEnginePage(QWebEnginePage):
+    def javaScriptConsoleMessage(self, level, message: str, line_number: int, source_id: str) -> None:  # type: ignore[override]
+        text = str(message or "")
+        source = str(source_id or "")
+        if any(fragment in text for fragment in IGNORED_WEB_CONSOLE_FRAGMENTS):
+            return
+        if any(fragment in source for fragment in IGNORED_WEB_CONSOLE_FRAGMENTS):
+            return
+        super().javaScriptConsoleMessage(level, message, line_number, source_id)
 
 
 def _build_browser_unavailable_card(

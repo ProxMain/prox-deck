@@ -42,6 +42,7 @@ def widget_icon_asset(widget_id: str) -> str:
         "clock": "icon_clock.svg",
         "web": "icon_web.svg",
         "launcher": "icon_launcher.svg",
+        "stream-deck": "icon_stream_deck.svg",
         "notes": "icon_notes.svg",
         "system-stats": "icon_system.svg",
         "media-controls": "icon_media.svg",

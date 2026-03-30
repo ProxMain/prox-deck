@@ -1,0 +1,16 @@
+{
+  "widget_id": "stream-deck",
+  "display_name": "Stream Deck",
+  "version": "1.0.0",
+  "kind": "builtin",
+  "compatibility": {
+    "minimum_app_version": "1.0.0"
+  },
+  "install_metadata": {
+    "distribution": "core",
+    "installation_scope": "bundled"
+  },
+  "capabilities": ["process-launch", "settings-mutation"],
+  "entrypoint": "widgets.stream_deck",
+  "supports_multiple_instances": true
+}

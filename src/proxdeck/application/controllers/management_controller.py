@@ -118,6 +118,20 @@ class ManagementController:
             items=items,
         )
 
+    def configure_stream_deck_widget(
+        self,
+        screen_id: str,
+        instance_id: str,
+        size_variant: str,
+        buttons: list[dict[str, object]],
+    ) -> Screen:
+        return self._widget_management_service.configure_stream_deck_widget(
+            screen_id=screen_id,
+            instance_id=instance_id,
+            size_variant=size_variant,
+            buttons=buttons,
+        )
+
     def update_widget_instance_placement(
         self,
         screen_id: str,

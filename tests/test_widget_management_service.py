@@ -5,6 +5,8 @@ from proxdeck.application.services.screen_service import ScreenService
 from proxdeck.application.services.widget_management_service import WidgetManagementService
 from proxdeck.domain.contracts.screen_repository import ScreenRepository
 from proxdeck.domain.models.screen import Screen
+from proxdeck.domain.models.screen_availability import ScreenAvailability
+from proxdeck.domain.models.screen_layout import ScreenLayout
 from proxdeck.domain.models.widget_kind import WidgetKind
 from proxdeck.domain.policies.layout_policy import LayoutPolicy
 from proxdeck.domain.policies.screen_availability_policy import ScreenAvailabilityPolicy
@@ -43,6 +45,18 @@ class InMemoryScreenRepository(ScreenRepository):
         self.active_screen_id = screen_id
 
 
+class EmptyDefaultScreenFactory:
+    def create_defaults(self) -> list[Screen]:
+        return [
+            Screen(
+                screen_id="gaming",
+                name="Gaming",
+                availability=ScreenAvailability.AVAILABLE,
+                layout=ScreenLayout(),
+            )
+        ]
+
+
 def build_management_service() -> WidgetManagementService:
     project_root = Path(__file__).resolve().parent.parent
     widget_catalog = DiscoveredWidgetCatalog(
@@ -66,7 +80,7 @@ def build_management_service() -> WidgetManagementService:
     screen_service = ScreenService(
         screen_repository=InMemoryScreenRepository(),
         widget_catalog=widget_catalog,
-        default_screen_factory=DefaultScreenFactory(),
+        default_screen_factory=EmptyDefaultScreenFactory(),
         layout_policy=layout_policy,
         availability_policy=ScreenAvailabilityPolicy(),
     )
@@ -74,6 +88,43 @@ def build_management_service() -> WidgetManagementService:
         screen_service=screen_service,
         widget_catalog=widget_catalog,
         widget_placement_finder=WidgetPlacementFinder(layout_policy),
+    )
+
+
+def build_management_service_with_stream_deck_provider(
+    provider,
+) -> WidgetManagementService:
+    project_root = Path(__file__).resolve().parent.parent
+    widget_catalog = DiscoveredWidgetCatalog(
+        widget_discovery=FilesystemWidgetDiscovery(
+            roots=(
+                WidgetDiscoveryRoot(
+                    path=project_root / "widgets",
+                    expected_kind=WidgetKind.BUILTIN,
+                ),
+                WidgetDiscoveryRoot(
+                    path=project_root / "installable_widgets",
+                    expected_kind=WidgetKind.INSTALLABLE,
+                ),
+            ),
+            loader=JsonWidgetManifestLoader(),
+        ),
+        current_app_version=AppVersion.parse("1.0.0"),
+        compatibility_policy=WidgetCompatibilityPolicy(),
+    )
+    layout_policy = LayoutPolicy()
+    screen_service = ScreenService(
+        screen_repository=InMemoryScreenRepository(),
+        widget_catalog=widget_catalog,
+        default_screen_factory=EmptyDefaultScreenFactory(),
+        layout_policy=layout_policy,
+        availability_policy=ScreenAvailabilityPolicy(),
+    )
+    return WidgetManagementService(
+        screen_service=screen_service,
+        widget_catalog=widget_catalog,
+        widget_placement_finder=WidgetPlacementFinder(layout_policy),
+        stream_deck_default_buttons_provider=provider,
     )
 
 
@@ -123,7 +174,7 @@ def test_management_state_lists_builtin_widgets() -> None:
     state = service.load_management_state()
 
     widget_ids = {item.widget_id for item in state.widget_definitions}
-    assert {"clock", "launcher", "notes", "system-stats", "web", "media-controls"} <= widget_ids
+    assert {"clock", "launcher", "notes", "stream-deck", "system-stats", "web", "media-controls"} <= widget_ids
 
 
 def test_management_service_builds_default_launcher_items() -> None:
@@ -169,6 +220,88 @@ def test_management_service_updates_launcher_items() -> None:
         {"label": "Docs", "target": "https://example.com/docs"},
         {"label": "Mail", "target": "mailto:test@example.com"},
     ]
+
+
+def test_management_service_builds_default_stream_deck_settings() -> None:
+    service = build_management_service()
+
+    screen = service.add_widget_instance(
+        screen_id="gaming",
+        widget_id="stream-deck",
+        column=0,
+        row=0,
+        width=1,
+        height=2,
+    )
+
+    settings = screen.layout.widget_instances[0].settings
+    assert settings["size_variant"] == "2/6-tall"
+    assert settings["buttons"][0]["action_type"] == "launch"
+
+
+def test_management_service_caps_default_stream_deck_buttons_when_provider_is_present() -> None:
+    service = build_management_service_with_stream_deck_provider(
+        lambda limit: [
+            {
+                "id": f"steam-{index}",
+                "label": f"Steam {index}",
+                "icon": "asset:stream_deck_steam.svg",
+                "action_type": "launch",
+                "action_config": {"target": f"steam://rungameid/{index}"},
+            }
+            for index in range(limit)
+        ]
+    )
+
+    screen = service.add_widget_instance(
+        screen_id="gaming",
+        widget_id="stream-deck",
+        column=0,
+        row=0,
+        width=1,
+        height=2,
+    )
+
+    settings = screen.layout.widget_instances[0].settings
+    assert len(settings["buttons"]) == 64
+    assert settings["buttons"][0]["label"] == "YouTube"
+    assert settings["buttons"][1]["label"] == "Discord"
+
+
+def test_management_service_configures_stream_deck_widget() -> None:
+    service = build_management_service()
+    screen = service.add_widget_instance(
+        screen_id="gaming",
+        widget_id="stream-deck",
+        column=0,
+        row=0,
+        width=1,
+        height=1,
+    )
+    instance_id = screen.layout.widget_instances[0].instance_id
+
+    updated = service.configure_stream_deck_widget(
+        screen_id="gaming",
+        instance_id=instance_id,
+        size_variant="2/6-tall",
+        buttons=[
+            {
+                "id": "discord",
+                "label": "Discord",
+                "icon": "DSC",
+                "action_type": "launch",
+                "action_config": {
+                    "target": "discord.exe",
+                    "arguments": ["--start-minimized"],
+                },
+            }
+        ],
+    )
+
+    instance = updated.layout.widget_instances[0]
+    assert (instance.placement.width, instance.placement.height) == (1, 2)
+    assert instance.settings["size_variant"] == "2/6-tall"
+    assert instance.settings["buttons"][0]["action_config"]["target"] == "discord.exe"
 
 
 def test_management_service_updates_widget_placement() -> None:
@@ -324,3 +457,26 @@ def test_management_service_resizes_widget_and_rehomes_it_when_needed() -> None:
     placement = updated.layout.widget_instances[0].placement
     assert (placement.width, placement.height) == (2, 1)
     assert (placement.column, placement.row) == (1, 0)
+
+
+def test_management_service_rejects_unsupported_stream_deck_resize() -> None:
+    service = build_management_service()
+    screen = service.add_widget_instance(
+        screen_id="gaming",
+        widget_id="stream-deck",
+        column=0,
+        row=0,
+        width=1,
+        height=1,
+    )
+
+    try:
+        service.resize_widget_instance_smart(
+            screen_id="gaming",
+            instance_id=screen.layout.widget_instances[0].instance_id,
+            size_preset="2/6-wide",
+        )
+    except ValueError as error:
+        assert "1/6" in str(error)
+    else:  # pragma: no cover - defensive assertion
+        raise AssertionError("Expected unsupported Stream Deck resize to be rejected")
